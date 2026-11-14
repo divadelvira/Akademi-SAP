@@ -599,7 +599,7 @@ function L(t,o){
   if(o.tc) h+=`<div class="tbl-wrap"><table><tr><th style="width:34%">T-code / app</th><th>Fungsi</th></tr>${o.tc.map(r=>`<tr><td>${r[0].split(' / ').map(tcCell).join(' ')}</td><td>${r[1]}</td></tr>`).join('')}</table></div>`;
   if(o.integ) h+=`<div class="callout"><b>Integrasi</b>${o.integ}</div>`;
   if(o.tip) h+=`<div class="callout warn"><b>Di lapangan</b>${o.tip}</div>`;
-  return {t,html:h,keys:o.keys,cp:cp(...o.cp),tcRows:o.tc||[]};
+  return {t,html:h,keys:o.keys,cp:cp(...o.cp),tcRows:o.tc||[],flow:o.flow||null};
 }
 const QZ=a=>a.map(x=>cp(...x));
 
@@ -1000,7 +1000,7 @@ tc:[['MM01 / MM02 / MM03','Membuat / mengubah / menampilkan material'],['MM60','
 keys:['View per level organisasi','Material type mengatur view dan akun','Data master yang rapi = proses lancar'],
 cp:['Tim sales tidak bisa membuat order untuk material baru, padahal material sudah ada. Penyebab yang paling mungkin?',['View Sales untuk sales org/channel tersebut belum dibuat','Material type salah warna','Vendor belum dibuat','Periode tertutup'],0,'Sales order butuh view Sales di sales area terkait.']}),
 L('Batch dan klasifikasi',{p:['<b>Batch</b> mengelompokkan stok dengan sifat sama, misalnya tanggal produksi dan kedaluwarsa. Wajib untuk makanan, farmasi, dan kimia agar bisa ditelusuri (traceability) dan dipakai FEFO.','Sifat batch dicatat lewat <b>klasifikasi</b>: characteristic (CT04) dikumpulkan dalam class (CL02), lalu nilainya diisi per batch. <b>Batch where-used</b> (MB56) menunjukkan ke mana saja batch bahan baku dipakai, penting saat recall.'],
-tc:[['MSC1N / MSC3N','Membuat / menampilkan batch'],['CT04','Characteristic'],['CL02','Class'],['MB56','Batch where-used list'],['VB(','Shelf-life list (stok mendekati kedaluwarsa)']],
+tc:[['MSC1N / MSC3N','Membuat / menampilkan batch'],['CT04','Characteristic'],['CL02','Class'],['MB56','Batch where-used list']],
 keys:['Batch = traceability + FEFO','Characteristic → class → nilai per batch','MB56 untuk recall'],
 cp:['Ada keluhan kontaminasi pada satu batch gula. Kamu harus tahu produk jadi mana saja yang memakai batch itu. Laporan yang tepat?',['Batch where-used (MB56)','MB52','FBL5N','KSB1'],0,'MB56 menelusuri pemakaian batch.']}),
 L('Variant configuration dan laporan logistik',{p:['<b>Variant configuration</b> dipakai untuk produk dengan banyak pilihan (misalnya mesin dengan pilihan voltase dan warna). Satu material configurable dengan super BOM dan aturan (dependencies) menggantikan ratusan nomor material.','<b>LIS</b> (Logistics Information System) menyediakan analisis standar: stok (MC.9), pembelian (MCE1), penjualan (MCTA). Di S/4HANA, banyak analisis pindah ke app Fiori analitik berbasis CDS.'],
@@ -1405,11 +1405,12 @@ const ROLES=[
 {id:'sec',grp:'tech',t:'Security & GRC Analyst',d:'Mengelola role, akses, SoD, dan dukungan audit.',tasks:['Desain role PFCG','Analisis SoD','Access review & audit'],w:['grc','basis'],g:['nav','org'],p:['fi-gl','mm-pur','hcm','abap']},
 {id:'bi',grp:'tech',t:'BI / Data Analyst',d:'Menyediakan data, laporan, dan dashboard untuk keputusan bisnis.',tasks:['Query & dashboard','Monitoring load data','Rekonsiliasi KPI'],w:['bw'],g:['nav','org','fi-gl','co'],p:['sd','mm-im','abap','ibp']}
 ];
-const REL={w:['Wajib','rel-w','Inti pekerjaan role ini. Kuasai lebih dulu.'],g:['General','rel-g','Dipakai umum sehari-hari, termasuk dasar SAP.'],p:['Pendukung','rel-p','Membantu memahami proses tetangga. Pelajari setelah wajib & general.']};
+const REL={w:['Kompetensi inti','rel-w','Inti pekerjaan role ini. Kuasai lebih dulu.','Inti'],g:['Kompetensi general','rel-g','Dipakai umum sehari-hari, termasuk dasar SAP.','General'],p:['Pendukung','rel-p','Membantu memahami proses tetangga. Pelajari setelah inti & general.','Pendukung'],a:['Add-on','rel-p','Modul tambahan pilihanmu di luar role.','Add-on']};
 function roleOf(){return ROLES.find(r=>r.id===S.role)||null;}
 function relOf(mid,r){r=r===undefined?roleOf():r;if(!r)return null;return r.w.includes(mid)?'w':r.g.includes(mid)?'g':r.p.includes(mid)?'p':null;}
+function relOrAdd(mid){return relOf(mid)||((S.addons||[]).includes(mid)?'a':null);}
 function rolePath(r){const f=r.g.filter(x=>x==='nav'||x==='org');return [...f,...r.w,...r.g.filter(x=>!f.includes(x)),...r.p];}
-function relPill(k){return k?`<span class="pill ${REL[k][1]}">${REL[k][0]}</span>`:'';}
+function relPill(k){return k?`<span class="pill ${REL[k][1]}">${REL[k][3]}</span>`:'';}
 
 /* ---------- studi kasus keputusan → modul ---------- */
 const CASE_MOD={'Pembelian':'mm-pur','Jasa':'mm-pur','Movement type':'mm-im','Penerimaan':'mm-im','Opname':'mm-pi','Inventory':'mm-pi','Aset':'fi-aa','Biaya proyek':'ps','Laporan':'ps','K3 & keamanan pangan':'ps-ops','Document control':'ps-ops'};
@@ -1418,6 +1419,341 @@ CASES.forEach(c=>{c.mod=CASE_MOD[c.tag]||'ps-ops';});
 /* ---------- migrasi progres versi lama (modul 1–8) ---------- */
 (()=>{if(S.v3)return;['les','mq','notes'].forEach(k=>{const o=S[k]||{};Object.keys(o).forEach(key=>{const x=LEG_MAP[key];if(x){o[x[0]]=o[key];delete o[key];}});S[k]=o;});
  const had=Object.keys(S.les).length||Object.keys(S.sims||{}).length;if(!S.role&&had)S.role='proj';S.v3=true;save();})();
+
+/* ===================== PRAKTIK PER BAB (1): T-code bab lama + studi kasus bab ===================== */
+// T-code penting untuk bab modul lama (dipakai simulator bab, studi kasus, glosarium, flashcard)
+const LEG_TC={
+nav:[[['SU3','Mengatur data user sendiri: bahasa, format tanggal, default'],['SESSION_MANAGER','Menu awal SAP Easy Access']],[['ME23N','Menampilkan PO, latihan membaca bagian layar'],['SU3','Data user sendiri']],[['ME5A','Daftar PR'],['MB52','Stok gudang'],['MMBE','Stock overview']],[['ME2N','Laporan PO: F8 untuk execute'],['MM03','Display material: F4 untuk mencari']],[['ME2N','Laporan dengan multiple selection dan variant'],['MB51','Riwayat dokumen material dengan variant']],[['MB52','Laporan stok yang sering di-export'],['SMEN','SAP Easy Access dan Favorites']]],
+org:[[['MM03','Data induk material'],['ME23N','Data transaksi: PO']],[['MMBE','Stok per company code, plant, dan sloc'],['CJ20N','Struktur proyek dan WBS']],[['MM03','Material master'],['XK03','Data vendor (ECC)'],['KS03','Cost center']],[['CJ20N','WBS untuk account assignment P'],['KS03','Cost center untuk account assignment K'],['IW33','Order maintenance untuk account assignment F']]],
+'mm-pur':[[['ME51N','Membuat PR'],['ME21N','Membuat PO (procurement)'],['MIGO','Goods receipt'],['MIRO','Invoice verification']],[['ME51N','Membuat purchase requisition'],['ME52N','Mengubah PR sebelum diproses']],[['ME53N','Menampilkan PR'],['ME23N','Menampilkan PO'],['MB03','Menampilkan dokumen material']],[['ME23N','PO dan tab PO history'],['ME2M','Riwayat PO per material']],[['MIRO','Posting invoice dengan 3-way match'],['MIR4','Menampilkan invoice']],[['ME5A','Daftar dan status PR'],['ME2N','Daftar PO, filter WE101']],[['ML81N','Service entry sheet untuk jasa'],['MIGO','Goods receipt untuk barang']]],
+'mm-im':[[['MIGO','Goods movement'],['MB03','Menampilkan dokumen material']],[['MIGO','Posting GR/GI dengan movement type'],['MB51','Riwayat movement type per material']],[['MIGO','Memilih movement type yang tepat'],['MMBE','Cek stok sesudah posting']],[['MIGO','Cancellation A03 + R02'],['MB51','Mencari dokumen yang salah']]],
+'mm-pi':[[['MB52','Stok per gudang'],['MMBE','Stok satu material di semua lokasi'],['MB51','Riwayat pergerakan']],[['MI01','Membuat dokumen opname'],['MI04','Input hasil hitung'],['MI20','Daftar selisih'],['MI07','Posting selisih']],[['MI01','Membuat dokumen opname dengan posting block'],['MI21','Mencetak lembar hitung']],[['MI11','Recount'],['MI20','Daftar selisih untuk berita acara']]],
+'fi-aa':[[['AS03','Menampilkan aset'],['AR01','Daftar aset per cost center']],[['CJ20N','WBS proyek CAPEX'],['AW01N','Asset Explorer: nilai AuC']],[['AS03','Data master aset'],['AW01N','Nilai dan penyusutan per tahun']],[['AIAB','Distribusi biaya AuC'],['AIBU','Settlement AuC ke aset final']]],
+ps:[[['CJ20N','Project Builder: struktur WBS'],['CJ03','Menampilkan project definition']],[['CJI3','Biaya aktual proyek'],['CJI5','Komitmen proyek'],['KSB1','Biaya cost center']],[['CJI3','Data aktual untuk Kurva S'],['CJ20N','Progres dan tanggal WBS']],[['CJI3','Export biaya mingguan'],['CJI5','Export komitmen mingguan'],['KOB1','Biaya internal order']]],
+'ps-ops':[[['ME5A','Cek PR proyek setiap hari'],['ME2N','PO yang dijadwalkan datang']],[['ME5A','Nomor PR untuk database PWO'],['ME2N','Nomor PO untuk database PWO']],[['ME23N','PO sebagai dokumen kontrol'],['ML81N','Service entry sheet (BAST jasa)']],[['IW21','Membuat notifikasi'],['IW38','Daftar work order'],['IW33','Menampilkan work order']],[['IW21','Melaporkan temuan/kerusakan'],['IW38','Memantau order perbaikan']]]
+};
+LEGACY_MODS.forEach(m=>{const t=LEG_TC[m.id];if(t)m.lessons.forEach((l,i)=>{if(!l.tcRows&&t[i])l.tcRows=t[i];});});
+
+// Studi kasus per bab: [skenario, pertanyaan, [jawaban benar, umpan balik], [salah, umpan balik], [salah, umpan balik]]
+const BABCASE={
+nav:[
+['Hari pertamamu. IT mengirim akses PRD dan QAS. Supervisor minta kamu "coba-coba dulu" membuat PR untuk latihan.','Kamu login ke sistem mana untuk latihan?',['QAS / client training','Tepat. QAS dibuat untuk testing tanpa risiko ke data asli.'],['PRD','PRD berisi data asli; PR latihan akan ikut diproses Procurement.'],['Pakai user rekan yang sudah biasa','Setiap posting tercatat atas nama user. Jangan berbagi user.']],
+['Setelah klik Save, status bar kuning bertuliskan "Delivery date cannot be met".','Apa arti pesan ini?',['Warning: dokumen bisa disimpan setelah Enter, tapi perlu ditindaklanjuti','Tepat. Kuning = warning, tidak memblokir.'],['Error: dokumen gagal total','Error berwarna merah dan tidak bisa disimpan.'],['Sukses: abaikan saja','Warning tetap perlu dibaca dan dikomunikasikan.']],
+['Kamu sedang di ME23N dan ingin cek stok di MB52 tanpa kehilangan layar PO.','Perintah yang tepat di command field?',['/oMB52','Tepat. /o membuka session baru, PO tetap terbuka.'],['MB52','Dari dalam transaksi, T-code tanpa /n atau /o ditolak.'],['/nMB52','/n menutup ME23N dan membuka MB52 di jendela yang sama.']],
+['Di layar filter ME2N kamu sudah mengisi semua kriteria. Laporan belum muncul.','Tombol mana yang menjalankan laporan?',['F8 (Execute)','Tepat. F8 menjalankan laporan dari selection screen.'],['F3 (Back)','F3 kembali ke layar sebelumnya.'],['F4','F4 membuka daftar pilihan untuk field.']],
+['Setiap Senin kamu menarik ME2N dengan filter yang sama: P05, plant 1100, WE101.','Cara paling efisien?',['Simpan filter sebagai variant, lalu panggil dengan Get Variant','Tepat. Variant menghemat waktu dan mencegah salah filter.'],['Ketik ulang semua filter setiap minggu','Bisa, tapi lambat dan rawan salah.'],['Minta IT membuat laporan baru','Tidak perlu; variant sudah cukup.']],
+['Supervisor minta daftar stok Gudang Proyek dalam Excel setiap Jumat.','Langkah yang tepat setelah MB52 tampil?',['Export ALV ke spreadsheet','Tepat. Export menjaga angka sama dengan SAP.'],['Screenshot layar lalu ketik ulang di Excel','Rawan salah ketik dan lambat.'],['Kirim nomor material saja','Supervisor butuh qty dan nilai, bukan hanya nomor.']]
+],
+org:[
+['Rekan bertanya kenapa PO bisa "salah vendor" padahal vendor di master sudah benar.','Mana yang termasuk data transaksi?',['Purchase order','Tepat. PO adalah transaksi yang memakai data induk.'],['Vendor master','Vendor adalah data induk.'],['Material master','Material adalah data induk.']],
+['Ada dua pabrik: Cikarang (1100) dan Surabaya (1200). Kamu mau GR barang untuk Cikarang.','Data organisasi mana yang harus benar di GR?',['Plant 1100 dan storage location tujuan','Tepat. Stok tercatat per plant dan sloc.'],['Company code saja','Company code terlalu tinggi; stok dicatat di plant/sloc.'],['Purchasing group','Purchasing group tidak menentukan lokasi stok.']],
+['Kamu harus membuat PR bearing, tapi tidak yakin satuan dan buyer default-nya.','Data yang kamu baca dulu?',['Material master (MM03): base unit dan purchasing group','Tepat. Material master memuat data itu.'],['Laporan MB51','MB51 adalah riwayat pergerakan.'],['Tanya vendor','Data internal ada di SAP.']],
+['Kabel 50 M untuk panel baru proyek Conveyor Line 3.','Account assignment yang tepat?',['P + WBS proyek','Tepat. Biaya proyek masuk ke WBS.'],['K + cost center produksi','Biaya proyek akan bercampur dengan biaya operasional.'],['Tanpa account assignment','Barang akan menjadi stok, bukan biaya proyek.']]
+],
+'mm-pur':[
+['Supervisor bertanya kenapa barang yang dia minta minggu lalu belum datang.','Urutan dokumen mana yang benar?',['PR → approval → PO → GR → invoice → bayar','Tepat. Ini alur procure to pay.'],['PO → PR → GR','PO dibuat dari PR yang sudah disetujui.'],['GR → PO → PR','GR baru mungkin setelah PO.']],
+['PR 10 bearing untuk proyek. Kamu mengisi A = P tapi SAP menolak save.','Apa yang kurang?',['WBS di tab Account Assignment','Tepat. A = P wajib WBS.'],['Nomor vendor','Vendor tidak wajib di PR.'],['Harga final','Harga diisi Procurement di PO.']],
+['Atasan bertanya nomor dokumen dari sebuah pengiriman yang kamu terima kemarin.','Nomor 5000187342 kemungkinan besar dokumen apa?',['Dokumen material GR','Tepat. Seri 50xxxx umumnya dokumen material GR.'],['Purchase order','PO berseri 45xxxxxxxx.'],['Purchase requisition','PR berseri 10xxxxxx.']],
+['Vendor menanyakan apakah invoice mereka sudah diterima Finance.','Di mana kamu cek?',['ME23N tab PO history (baris RE-L)','Tepat. RE-L menunjukkan invoice tercatat.'],['MB52','MB52 hanya stok.'],['ME51N','ME51N untuk membuat PR.']],
+['Invoice 10 pcs, GR baru 8 pcs, harga sama.','Status invoice?',['Blocked for payment sampai GR lengkap','Tepat. Qty invoice melebihi GR.'],['Langsung dibayar','3-way match gagal.'],['Otomatis dihapus','Invoice tetap tersimpan, hanya diblok.']],
+['Rapat mingguan butuh daftar PO proyek yang belum datang.','Parameter yang dipakai di ME2N?',['WE101 (open goods receipt)','Tepat.'],['RE101','Bukan parameter penerimaan barang.'],['Tanpa filter','Hasilnya terlalu banyak.']],
+['Jasa commissioning selesai dan BAST ditandatangani.','Penerimaan jasa dicatat dengan…',['Service entry sheet (ML81N)','Tepat. Jasa tidak di-GR lewat MIGO.'],['MIGO 101','MIGO untuk barang.'],['MI04','MI04 untuk opname.']]
+],
+'mm-im':[
+['Gudang mau menerima barang PO tapi bingung pilihan di MIGO.','Kombinasi yang benar?',['A01 Goods Receipt + R01 Purchase Order','Tepat.'],['A07 + R10','Itu goods issue.'],['A03 + R02','Itu pembatalan.']],
+['Teknisi mengambil 50 M kabel untuk panel proyek P-26-014.04.','Movement type?',['221 ke WBS','Tepat. 221 = GI ke proyek.'],['201','201 untuk cost center.'],['261','261 untuk order.']],
+['Grease untuk pelumasan rutin mesin Line 3.','Movement type?',['201 ke cost center Line 3','Tepat. Biaya operasional rutin.'],['221','Bukan proyek.'],['311','311 hanya memindah lokasi.']],
+['GI 221 terposting ke WBS yang salah kemarin.','Cara koreksi yang benar?',['Cancel dengan A03 + R02, lalu posting ulang','Tepat. Pembatalan otomatis memakai 222.'],['Posting 101 untuk mengembalikan','101 untuk GR PO.'],['Biarkan, koreksi di Excel','SAP dan laporan akan berbeda.']]
+],
+'mm-pi':[
+['Teknisi butuh 6 coupling; Gudang Sparepart bilang kosong.','Laporan tercepat untuk melihat lokasi lain?',['MMBE','Tepat. Satu material di semua lokasi.'],['MB52','MB52 per gudang.'],['ME2N','Itu daftar PO.']],
+['Opname Gudang Sparepart besok. Dokumen sudah dibuat di MI01.','Langkah setelah menghitung fisik?',['MI04 input hasil hitung','Tepat.'],['MI07 posting selisih langsung','Investigasi dan approval dulu.'],['MI01 lagi','Dokumen sudah ada.']],
+['Gudang masih menerima barang saat tim sedang menghitung.','Pencegahan yang tepat?',['Cut-off dan posting block di dokumen opname','Tepat.'],['Hitung dua kali','Tetap tidak menghentikan pergerakan.'],['Abaikan','Hasil opname tidak valid.']],
+['MI20 menunjukkan selisih -3 pcs coupling.','Langkah pertama?',['Investigasi: cek MB51, recount MI11','Tepat.'],['Langsung MI07','Selisih belum diverifikasi.'],['GR 101 3 pcs','Tidak ada PO yang diterima.']]
+],
+'fi-aa':[
+['Proyek membeli mesin filling baru Rp 1,2 M yang dipakai lebih dari 5 tahun.','Klasifikasi biayanya?',['CAPEX, dikumpulkan di WBS/AuC','Tepat.'],['OPEX ke cost center','Mesin baru bernilai besar adalah aset.'],['Biaya sparepart','Bukan konsumsi rutin.']],
+['Biaya mesin baru tersebar di PO material, jasa, dan instalasi.','Biaya dikumpulkan di…',['WBS lalu di-settle ke AuC','Tepat.'],['Langsung ke aset final','Aset final dibuat setelah commissioning.'],['Cost center produksi','Akan menjadi beban, bukan aset.']],
+['Auditor menanyakan lokasi dan cost center aset 1200345.','Transaksi untuk membaca data aset?',['AS03','Tepat.'],['MM03','Itu material.'],['ME23N','Itu PO.']],
+['Mesin sudah commissioning dan BAST ditandatangani.','Peranmu dalam kapitalisasi?',['Menyiapkan dokumen dan rincian biaya untuk Finance','Tepat. Finance yang menjalankan AIBU.'],['Menjalankan AIBU sendiri','Biasanya hak Finance.'],['Mengubah umur manfaat','Itu keputusan Finance.']],
+['Conveyor dipindah dari Line 1 ke Line 2 sejak Agustus, data SAP belum berubah.','Akibatnya?',['Penyusutan masih dibebankan ke cost center Line 1','Tepat. Perlu transfer/ubah cost center.'],['Tidak ada akibat','Laporan biaya per line akan salah.'],['Aset otomatis dihapus','SAP tidak tahu pemindahan fisik.']]
+],
+ps:[
+['Proyek Conveyor Line 3 punya WBS engineering, material, jasa, elektrikal.','Kabel panel masuk ke WBS…',['Elektrikal & commissioning (.04)','Tepat.'],['Engineering (.01)','Itu untuk desain.'],['Project definition P-26-014','Biaya tidak diposting ke project definition.']],
+['Budget 850 jt, actual 610 jt, komitmen 230 jt.','Sisa bebas?',['Rp 10 jt','Tepat. 850 − 610 − 230.'],['Rp 240 jt','Komitmen belum dikurangi.'],['Rp 620 jt','Salah hitung.']],
+['Minggu 7: rencana 53%, aktual 44%.','Status RAG?',['Red (SPI ≈ 0,83)','Tepat.'],['Green','Deviasi besar.'],['Amber','SPI di bawah 0,85 = Red.']],
+['Laporan mingguan harus dikirim Jumat pagi.','Data biaya diambil dari…',['CJI3 dan CJI5','Tepat. Actual dan komitmen.'],['MB52','Itu stok.'],['ME51N','Itu membuat PR.']]
+],
+'ps-ops':[
+['Senin pagi, kamu mulai rutinitas admin proyek.','Cek harian pertama yang paling penting?',['ME5A: PR proyek yang belum di-approve','Tepat.'],['MI20','Opname tidak harian.'],['AIBU','Kapitalisasi tidak harian.']],
+['Supervisor minta nomor PO untuk semua pekerjaan improvement bulan ini.','Sumber yang kamu update?',['Database PWO dengan nomor PR/PO/GR/SES','Tepat.'],['Ingatan saja','Rawan hilang.'],['Email lama','Sulit ditelusuri.']],
+['Auditor meminta bukti BAST untuk SES jasa instalasi.','Yang seharusnya ada?',['Arsip BAST yang terhubung dengan nomor PO/SES','Tepat.'],['Hanya nomor SES','Butuh bukti fisik/scan.'],['Foto pekerjaan saja','BAST tetap dibutuhkan.']],
+['Conveyor Line 3 sering macet dan kamu perlu koordinasi perbaikan.','Dokumen yang dibuat?',['Notifikasi PM (IW21)','Tepat.'],['PR baru','PR bukan laporan kerusakan.'],['MIGO 201','Itu GI.']],
+['Kontraktor mengelas di area produksi tanpa izin kerja panas.','Tindakan?',['Hentikan pekerjaan dan minta izin kerja panas serta pengamanan area','Tepat. K3 dan keamanan pangan didahulukan.'],['Biarkan karena dikejar target','Risiko kebakaran dan kontaminasi.'],['Foto lalu lanjut kerja','Bahaya tetap ada.']]
+],
+'fi-gl':[
+['Rekan Finance melihat dokumen dengan document type WE di akun persediaan.','Asal dokumen itu?',['Goods receipt dari MM','Tepat.'],['Pembayaran vendor','Itu KZ.'],['Invoice customer','Itu DR/RV.']],
+['Jurnal listrik terposting ke akun sewa; periode masih terbuka.','Koreksi yang benar?',['Reverse FB08 lalu posting ulang','Tepat.'],['Ubah akun di FB02','Akun tidak bisa diubah.'],['Hapus dokumen','Dokumen terposting tidak bisa dihapus.']],
+['CFO meminta laba rugi bulan Oktober versi manajemen.','Yang menentukan susunan barisnya?',['Financial Statement Version','Tepat.'],['Company code','Tidak menentukan susunan laporan.'],['Posting key','Itu debit/kredit.']]
+],
+'fi-ap':[
+['Vendor mengirim email minta ganti rekening bank.','Langkah aman?',['Verifikasi lewat kontak resmi dan dual control sebelum mengubah BP','Tepat. Ini titik rawan fraud.'],['Langsung ubah sesuai email','Bisa jadi phishing.'],['Abaikan','Pembayaran berikutnya bisa gagal.']],
+['Invoice jasa konsultan pajak tanpa PO.','Transaksi?',['FB60','Tepat.'],['MIRO','Butuh PO.'],['F-28','Itu penerimaan customer.']],
+['Vendor bertanya kenapa invoice yang jatuh tempo belum dibayar F110.','Cek pertama?',['FBL1N: payment block dan jatuh tempo','Tepat.'],['MB52','Bukan urusan stok.'],['VA03','Itu sales order.']]
+],
+'fi-ar':[
+['Customer baru dibuat oleh Sales, tapi billing gagal posting ke FI.','Data AR yang mungkin kosong?',['Reconciliation account / data company code customer','Tepat.'],['Harga material','Itu SD.'],['Movement type','Itu MM.']],
+['Customer transfer Rp 90 jt untuk invoice Rp 100 jt, sisanya bulan depan.','Pilihan di F-28 agar invoice lama tertutup?',['Residual item','Tepat.'],['Partial payment','Invoice tetap open.'],['Write-off','Customer masih akan bayar.']],
+['Piutang customer A sudah 95 hari lewat jatuh tempo.','Tindakan?',['Prioritaskan penagihan, kirim dunning, koordinasi dengan sales/credit','Tepat.'],['Tunggu saja','Risiko gagal bayar naik.'],['Hapus invoice','Tidak boleh tanpa approval write-off.']]
+],
+co:[
+['Biaya cost center Gudang naik 30 jt bulan ini.','Langkah analisis pertama?',['KSB1 line item untuk cari dokumen penyebab','Tepat.'],['Tambah budget','Belum tahu penyebabnya.'],['Abaikan','Kenaikan harus dijelaskan.']],
+['Laba produk A terlihat rendah, ternyata pendapatannya masuk profit center B.','Cek di mana?',['Profit center di master material A','Tepat.'],['Saldo bank','Tidak terkait.'],['Data vendor','Tidak terkait.']],
+['Budget internal order event 100 jt, actual sudah 98 jt, ada PO baru 5 jt.','Yang terjadi dengan availability control aktif?',['Peringatan/penolakan karena budget terlampaui','Tepat.'],['PO lolos tanpa info','Availability control memeriksa budget.'],['Order otomatis ditutup','Tidak.']],
+['Variance order produksi biskuit selalu besar untuk gula.','Area cek pertama?',['Qty gula di BOM dan GI ke order','Tepat.'],['Data customer','Tidak terkait.'],['Payment terms','Tidak terkait.']]
+],
+tr:[
+['Pagi ini bank statement Mandiri tidak semuanya cocok otomatis.','Baris yang tersisa diproses di…',['FEBAN','Tepat.'],['FB50 manual','Bisa dobel posting.'],['F110','Itu payment run.']],
+['Pembayaran pajak besar 3 minggu lagi belum ada dokumennya.','Agar masuk forecast kas?',['Buat memo record (FF63)','Tepat.'],['Abaikan','Forecast meleset.'],['Posting jurnal sekarang','Belum terjadi.']],
+['Batch pembayaran 2 M dari F110 siap dikirim ke bank.','Kontrol yang tepat?',['Approval berjenjang di BCM sebelum dikirim','Tepat.'],['Langsung kirim','Tanpa kontrol.'],['Kirim via email','Tidak aman.']]
+],
+fscm:[
+['Order customer tertahan, sales mendesak dirilis karena customer penting.','Langkah yang benar?',['Credit analyst menilai exposure dan mencatat keputusan rilis','Tepat.'],['Sales merilis sendiri','Melanggar kontrol kredit.'],['Hapus credit limit','Menghilangkan kontrol.']],
+['Customer bayar kurang 5 jt karena harga di invoice berbeda dengan kontrak.','Dokumentasikan sebagai…',['Dispute case dengan reason harga','Tepat.'],['Write-off','Belum diselidiki.'],['Credit memo langsung','Perlu verifikasi dulu.']],
+['Customer berjanji bayar Jumat.','Dicatat sebagai…',['Promise to pay','Tepat.'],['Dispute','Tidak ada sengketa.'],['Tidak perlu dicatat','Tidak bisa dipantau.']]
+]
+};
+
+/* ===================== PRAKTIK PER BAB (2): studi kasus bab Logistik, HR, Teknis, Cloud ===================== */
+Object.assign(BABCASE,{
+sd:[
+['Customer modern trade punya 12 DC, tetapi tagihan selalu ke kantor pusat.','Bagaimana mengatur partner-nya?',['Sold-to/bill-to/payer kantor pusat, ship-to per DC','Tepat.'],['Buat 12 customer terpisah tanpa relasi','Tagihan akan tersebar.'],['Isi alamat DC di teks order','Delivery memakai ship-to, bukan teks.']],
+['Customer komplain barang sudah diterima tapi belum ada invoice.','Cek di mana dulu?',['Document flow sales order','Tepat. Lihat apakah billing sudah dibuat.'],['MB52','Hanya stok.'],['FB60','Itu invoice vendor.']],
+['Order tersimpan dengan "Document is incomplete".','Tindakan?',['Lengkapi data di incompletion log sebelum delivery','Tepat.'],['Abaikan','Order bisa tidak terkirim.'],['Hapus order','Tidak perlu, cukup dilengkapi.']],
+['Billing sudah dibuat, tapi diskon customer lupa dimasukkan.','Koreksi yang benar?',['VF11 batalkan billing, perbaiki kondisi, billing ulang','Tepat.'],['Ubah jurnal di FB02','Jumlah tidak bisa diubah.'],['Kirim credit memo tanpa analisis','Bisa, tapi pembatalan lebih bersih jika belum dibayar.']]
+],
+pp:[
+['Produksi selalu kurang kemasan 5% dibanding rencana MRP.','Akar masalah yang paling mungkin?',['Qty atau scrap di BOM tidak sesuai pemakaian riil','Tepat.'],['Harga kemasan','Tidak memengaruhi qty.'],['Routing','Routing berisi operasi, bukan komponen.']],
+['MD04 gula: available -3.000 KG pada 10.11, PO datang 12.11 dengan "Reschedule in".','Tindakan planner?',['Minta purchasing memajukan PO ke ≤ 10.11','Tepat.'],['Batalkan PO','Malah tambah kurang.'],['Abaikan exception','Produksi bisa berhenti.']],
+['Operator tidak bisa konfirmasi CO11N untuk order baru.','Penyebab?',['Order belum di-release','Tepat.'],['BOM kosong','Tetap bisa konfirmasi jika REL.'],['Customer belum bayar','Tidak terkait.']]
+],
+qm:[
+['Bahan baku baru harus selalu diperiksa QC saat datang.','Setting yang dibutuhkan?',['Inspection type 01 aktif di view QM material','Tepat.'],['Ubah movement type ke 201','Tidak terkait.'],['Blokir vendor','Bukan solusi.']],
+['Gula lolos uji lab, tapi produksi tidak bisa memakainya.','Yang belum dilakukan?',['Usage decision dengan stock posting ke unrestricted','Tepat.'],['GR ulang','Barang sudah diterima.'],['Membuat PO','Tidak perlu.']],
+['Vendor tepung tiga kali gagal uji kadar air.','Dokumen tindak lanjut?',['Quality notification Q2 ke vendor','Tepat.'],['Q1','Q1 untuk keluhan customer.'],['Sales order','Tidak terkait.']]
+],
+pm:[
+['Motor conveyor dipindah dari Line 3 ke Line 1.','Yang perlu diupdate?',['Pemasangan equipment ke functional location Line 1','Tepat.'],['Buat functional location baru','Posisi sudah ada.'],['Tidak perlu','Riwayat dan biaya jadi salah.']],
+['Bearing perlu diambil gudang untuk order perbaikan 4000123.','Movement type?',['261','Tepat.'],['201','Itu cost center.'],['221','Itu proyek.']],
+['Plan pelumasan dibuat, tapi tidak pernah muncul order.','Cek?',['Penjadwalan IP10 dan job IP30','Tepat.'],['BOM produk','Tidak terkait.'],['Data vendor','Tidak terkait.']]
+],
+wm:[
+['Picker tidak tahu rak mana yang menyimpan 500010.','Laporan?',['Stok per bin (LX02)','Tepat.'],['MB52','Hanya sampai sloc.'],['VA05','Daftar sales order.']],
+['Barang sudah dipindah ke rak picking, sistem masih di rak tinggi.','Penyebab?',['TO belum dikonfirmasi (LT12)','Tepat.'],['GR belum diposting','Barang sudah di gudang.'],['Material master salah','Tidak terkait.']],
+['Supervisor ingin melihat semua warehouse task terbuka di EWM.','Tempat?',['/SCWM/MON','Tepat.'],['MB51','Riwayat dokumen material.'],['ME2N','Daftar PO.']]
+],
+le:[
+['120 order jatuh tempo kirim hari ini.','Cara membuat delivery?',['VL10 kolektif','Tepat.'],['VL01N satu per satu','Lambat.'],['VA01','Itu membuat order.']],
+['Kontainer impor datang minggu depan, gudang perlu persiapan.','Dokumen?',['Inbound delivery berdasarkan PO','Tepat.'],['Outbound delivery','Itu untuk pengiriman keluar.'],['Billing','Tidak terkait.']],
+['Satu truk membawa 6 delivery ke 6 toko.','Dokumen penyatu?',['Shipment (VT01N)','Tepat.'],['Sales order gabungan','Tidak perlu.'],['Handling unit','HU untuk kemasan.']]
+],
+cs:[
+['Customer minta perbaikan mesin yang dibeli 8 bulan lalu.','Cek pertama?',['Garansi dan kontrak servis equipment/serial','Tepat.'],['Saldo bank','Tidak terkait.'],['BOM produksi','Tidak terkait.']],
+['Servis selesai: 3 jam kerja dan 2 sparepart, tidak dalam garansi.','Penagihan?',['DP90 resource-related billing lalu VF01','Tepat.'],['FB60','Itu invoice vendor.'],['Tidak ditagih','Di luar garansi harus ditagih.']],
+['Pompa customer dikirim ke bengkel.','Dokumen pembuka?',['Repair order di SD','Tepat.'],['PO ke vendor','Belum perlu.'],['Production order','Bukan produksi baru.']]
+],
+lo:[
+['Sales tidak bisa membuat order untuk material baru.','Penyebab?',['View Sales untuk sales area belum dibuat','Tepat.'],['Vendor belum ada','Tidak terkait penjualan.'],['Periode FI tertutup','Tidak memblokir order.']],
+['Ada keluhan kontaminasi dari satu batch gula.','Laporan untuk menelusuri produk jadi?',['MB56 batch where-used','Tepat.'],['MB52','Hanya stok.'],['MM60','Daftar material.']],
+['Perusahaan menjual 300 kombinasi conveyor.','Pendekatan master data?',['Variant configuration','Tepat.'],['300 material terpisah','Sulit dirawat.'],['Teks bebas','Tidak terkontrol.']]
+],
+hcm:[
+['Staf admin resign, penggantinya mengisi kursi yang sama.','Objek yang tetap?',['Position','Tepat.'],['Person','Orangnya berganti.'],['Org unit baru','Tidak perlu.']],
+['Kenaikan gaji berlaku 1 Januari.','Cara di infotype 0008?',['Copy record dengan tanggal mulai baru','Tepat.'],['Change record lama','Riwayat hilang.'],['Delete lalu buat baru','Riwayat hilang.']],
+['Karyawan sakit 2 hari dengan surat dokter.','Infotype?',['2001 Absences','Tepat.'],['2002 Attendances','Itu kehadiran khusus.'],['0006','Itu alamat.']],
+['Simulasi payroll menunjukkan error untuk 3 karyawan.','Langkah?',['Perbaiki data, simulasi ulang sebelum payroll run','Tepat.'],['Lanjut payroll run','Error akan ikut.'],['Exit payroll','Periode belum benar.']]
+],
+basis:[
+['Konsultan ingin mengubah konfigurasi langsung di PRD.','Jawabanmu?',['Ubah di DEV, uji di QAS, transport ke PRD','Tepat.'],['Boleh jika sedikit','Melanggar kontrol perubahan.'],['Ubah di QAS saja','PRD tetap berbeda.']],
+['Job laporan stok pagi gagal.','Cek?',['SM37 log job','Tepat.'],['SU01','Itu user.'],['STMS','Itu transport.']],
+['Import ke PRD gagal karena objek dari request lain belum ada.','Pelajaran?',['Periksa urutan dan dependensi transport','Tepat.'],['Import terus sampai berhasil','Bisa merusak.'],['Ubah manual di PRD','Melanggar kontrol.']]
+],
+abap:[
+['Programmer perlu tahu field di tabel EKPO.','Transaksi?',['SE11','Tepat.'],['SM37','Job.'],['PA30','HR.']],
+['Laporan custom lambat; ada SELECT di dalam LOOP.','Perbaikan?',['Ambil data sekaligus di luar loop','Tepat.'],['Tambah server','Tidak menyelesaikan akar masalah.'],['Hapus ALV','Tidak terkait.']],
+['User ingin validasi tambahan saat PO disimpan.','Pendekatan?',['Implementasi BAdI/enhancement','Tepat.'],['Ubah kode standar','Merusak upgrade.'],['Matikan validasi','Tidak aman.']]
+],
+fiori:[
+['User mencari app pengganti ME23N.','Sumber?',['Fiori Apps Reference Library','Tepat.'],['SM37','Tidak terkait.'],['SE11','Tidak terkait.']],
+['Tile muncul tapi app error saat dibuka.','Cek?',['/IWFND/ERROR_LOG dan status OData service','Tepat.'],['Hapus user','Tidak perlu.'],['Restart PC','Jarang menyelesaikan.']],
+['Butuh app daftar + detail standar secepatnya.','Pendekatan?',['Fiori elements List Report + Object Page','Tepat.'],['SAPUI5 dari nol','Lebih lama.'],['SAPscript','Itu form cetak.']]
+],
+grc:[
+['User plant 1100 bisa membuat PO untuk plant 1200.','Perbaikan?',['Batasi nilai plant di role (derived role)','Tepat.'],['Ganti password','Tidak terkait.'],['Hapus user','Berlebihan.']],
+['Staff purchasing diminta ikut posting GR.','Risiko?',['Konflik SoD PO + GR','Tepat.'],['Tidak ada','Ada risiko fraud.'],['Hanya lisensi','Bukan hanya lisensi.']],
+['Auditor bertanya siapa yang punya SAP_ALL di PRD.','Laporan?',['SUIM','Tepat.'],['MB52','Tidak terkait.'],['SM37','Tidak terkait.']]
+],
+bw:[
+['Manajer butuh tren 5 tahun digabung data e-commerce.','Platform?',['Data warehouse (BW/4HANA atau Datasphere)','Tepat.'],['VA05','Hanya order SAP.'],['SE16N','Bukan alat analisis.']],
+['Finance terbiasa Excel dan ingin pivot data BW.','Alat?',['Analysis for Office','Tepat.'],['SM37','Tidak terkait.'],['FB50','Tidak terkait.']],
+['Dashboard pagi masih angka dua hari lalu.','Cek?',['Process chain di RSPC','Tepat.'],['Password user','Tidak terkait.'],['Material master','Tidak terkait.']]
+],
+pi:[
+['IDoc order dari customer status 51: material tidak dikenal.','Setelah mapping diperbaiki?',['Proses ulang dengan BD87','Tepat.'],['Hapus IDoc','Order hilang.'],['Buat order manual dan biarkan IDoc','Bisa dobel.']],
+['Pesan PO ke vendor gagal karena SFTP vendor mati.','Setelah server hidup?',['Resend pesan dari monitor','Tepat.'],['Buat PO baru','Dobel PO.'],['Ubah mapping','Tidak perlu.']],
+['Perusahaan ingin sinkron SuccessFactors ↔ S/4.','Langkah awal?',['Pakai prepackaged content di Integration Suite','Tepat.'],['Input ulang manual','Rawan salah.'],['Kirim file via email','Tidak aman.']]
+],
+sf:[
+['HR ingin data posisi dan organisasi di cloud.','Modul?',['Employee Central','Tepat.'],['Learning','Untuk pelatihan.'],['Recruiting','Untuk rekrutmen.']],
+['Kandidat menandatangani offer.','Modul berikutnya?',['Onboarding','Tepat.'],['Compensation','Belum saatnya.'],['Succession','Tidak terkait.']],
+['Manajer melihat data gaji divisi lain.','Perbaikan?',['Role-based permissions (target population)','Tepat.'],['Learning catalog','Tidak terkait.'],['Goal plan','Tidak terkait.']]
+],
+ariba:[
+['Supplier baru harus registrasi dan lolos kualifikasi sebelum tender.','Solusi?',['Supplier Lifecycle & Performance','Tepat.'],['Guided Buying','Untuk belanja karyawan.'],['Contracts','Setelah award.']],
+['Tender kemasan selesai di-award.','Agar harga baru dipakai user?',['Kontrak lalu katalog','Tepat.'],['Email ke user','Tidak terkontrol.'],['Ubah harga di MIRO','Salah tempat.']],
+['Supplier mengirim ship notice di Ariba Network.','Menjadi apa di S/4?',['Inbound delivery','Tepat.'],['Sales order','Tidak.'],['Asset','Tidak.']]
+],
+concur:[
+['Biaya dinas untuk proyek P-26-014.','Cost object?',['WBS proyek','Tepat.'],['Cost center pribadi','Biaya proyek salah tempat.'],['Kosong','Posting gagal.']],
+['Hotel melebihi batas kebijakan.','Yang terjadi?',['Peringatan dan butuh justifikasi/approval','Tepat.'],['Booking batal diam-diam','Tidak.'],['Gaji dipotong','Tidak.']],
+['Expense report gagal posting karena WBS sudah ditutup.','Penyebab?',['Status cost object di SAP','Tepat.'],['Foto struk','Tidak terkait.'],['Kartu kredit','Tidak terkait.']]
+],
+crm:[
+['Sales mengunjungi buyer toko ritel.','Dicatat sebagai?',['Activity (visit) pada account','Tepat.'],['Billing','Tidak.'],['Lead','Customer sudah ada.']],
+['Manajer ingin perkiraan pendapatan kuartal depan.','Data?',['Pipeline opportunity','Tepat.'],['Daftar contact','Tidak cukup.'],['Ticket','Itu service.']],
+['Agen perlu status kirim order saat menjawab ticket.','Yang memungkinkan?',['Integrasi C4C ↔ S/4HANA','Tepat.'],['SM37','Tidak terkait.'],['F110','Tidak terkait.']]
+],
+ibp:[
+['Planner ingin mengubah angka rencana per SKU.','Alat utama?',['Excel add-in IBP','Tepat.'],['SE38','Tidak.'],['MIGO','Tidak.']],
+['Forecast produk A selalu lebih tinggi dari realisasi.','Indikator?',['Bias positif','Tepat.'],['MAPE nol','Tidak mungkin.'],['Lead time','Tidak terkait.']],
+['Rencana S&OP disetujui direksi.','Eksekusi di S/4?',['PIR → MRP','Tepat.'],['Email ke gudang','Tidak terintegrasi.'],['Jurnal FI','Tidak terkait.']]
+]
+});
+
+/* ---------- Istilah kunci per modul (glosarium) ---------- */
+const TERMS={
+nav:[['Client','Unit data terpisah dalam satu sistem SAP, misalnya 800'],['Command field','Kotak di kiri atas untuk mengetik T-code'],['Variant','Filter tersimpan di layar seleksi'],['ALV','Tabel laporan SAP dengan sort, filter, total, export'],['/n · /o','Pindah transaksi di jendela sama · buka di jendela baru']],
+org:[['Company code','Entitas hukum'],['Plant','Pabrik/lokasi operasional'],['Storage location (sloc)','Lokasi gudang di dalam plant'],['Account assignment','Ke mana biaya dibebankan: K, P, F, A']],
+'mm-pur':[['PR','Purchase Requisition, permintaan pembelian internal'],['PO','Purchase Order, pesanan resmi ke vendor'],['3-way match','Pencocokan PO, GR, dan invoice'],['SES','Service Entry Sheet, penerimaan jasa'],['WE101','Parameter ME2N untuk PO yang belum diterima']],
+'mm-im':[['GR','Goods Receipt'],['GI','Goods Issue'],['Movement type','Kode jenis pergerakan stok, misalnya 101, 201, 221, 261, 311'],['Dokumen material','Bukti posting pergerakan stok']],
+'mm-pi':[['Posting block','Membekukan pergerakan item selama opname'],['Hitung buta','Lembar hitung tanpa qty buku'],['Recount','Hitung ulang item selisih']],
+'fi-aa':[['CAPEX','Belanja modal yang menjadi aset'],['AuC','Asset under Construction'],['APC','Nilai perolehan aset'],['Depreciation area','Area penyusutan: komersial, pajak']],
+ps:[['WBS','Work Breakdown Structure'],['Komitmen','Nilai PO yang mengikat budget'],['SPI','Schedule Performance Index = aktual ÷ rencana'],['RAG','Status Red-Amber-Green']],
+'ps-ops':[['PWO','Project Work Order / database pekerjaan proyek'],['BAST','Berita Acara Serah Terima'],['Izin kerja panas','Izin K3 untuk pengelasan/pemotongan']],
+'fi-gl':[['Universal Journal (ACDOCA)','Tabel tunggal FI dan CO di S/4HANA'],['Document type','Jenis dokumen: SA, KR, KZ, DR, DZ, WE, AA'],['Posting period','Periode akuntansi yang dibuka/ditutup'],['FSV','Financial Statement Version']],
+'fi-ap':[['Reconciliation account','Akun G/L penampung saldo vendor/customer'],['Payment terms','Syarat jatuh tempo'],['Payment block','Penahan pembayaran pada invoice'],['Payment run','Proses F110']],
+'fi-ar':[['Residual item','Sisa tagihan yang dibuat sebagai item baru'],['Partial payment','Pembayaran sebagian, invoice tetap open'],['Dunning','Surat pengingat bertingkat'],['Aging','Umur piutang']],
+co:[['Cost center','Unit penanggung biaya'],['Profit center','Unit pengukur laba'],['Internal order','Penampung biaya kegiatan sementara'],['Settlement','Pemindahan biaya ke penerima akhir'],['Variance','Selisih aktual vs standar']],
+tr:[['House bank','Bank perusahaan di SAP'],['Cash position','Posisi kas jangka sangat pendek'],['Liquidity forecast','Perkiraan arus kas'],['Memo record','Catatan rencana kas tanpa dokumen']],
+fscm:[['Credit exposure','Piutang + order terbuka'],['Credit block','Penahan order karena kredit'],['Dispute case','Kasus sengketa tagihan'],['Promise to pay','Janji bayar customer']],
+sd:[['Sales area','Sales org + channel + division'],['Ship-to / sold-to','Penerima barang / pemesan'],['PGI','Post Goods Issue (mvt 601)'],['Document flow','Rantai dokumen penjualan'],['Incompletion log','Daftar data wajib yang belum diisi']],
+pp:[['BOM','Bill of Material'],['Routing','Urutan operasi produksi'],['MRP','Material Requirements Planning'],['Planned order','Usulan produksi dari MRP'],['TECO','Technically completed']],
+qm:[['Inspection lot','Lot pemeriksaan yang dibuat otomatis'],['Usage decision','Keputusan terima/tolak lot'],['QI stock','Stok yang masih diperiksa']],
+pm:[['Functional location','Posisi teknis di plant'],['Equipment','Mesin fisik'],['Notification','Laporan masalah/permintaan'],['Maintenance plan','Jadwal perawatan preventif']],
+wm:[['Storage bin','Posisi rak'],['Quant','Stok di satu bin'],['Transfer order','Perintah pindah barang (WM)'],['Warehouse task','Tugas pindah barang (EWM)']],
+le:[['Shipping point','Titik pengiriman'],['Inbound delivery','Pemberitahuan barang datang'],['Shipment','Kumpulan delivery dalam satu angkutan'],['Handling unit','Kemasan seperti karton/palet']],
+cs:[['Installed base','Equipment di lokasi customer'],['Service contract','Kontrak layanan'],['Resource-related billing','Penagihan berdasarkan biaya aktual']],
+lo:[['Material type','Jenis material: ROH, HALB, FERT, ERSA'],['Batch','Kelompok stok dengan sifat sama'],['FEFO','First expired, first out'],['Variant configuration','Produk dengan banyak pilihan']],
+hcm:[['Infotype','Blok data karyawan'],['Personnel action','Peristiwa: hiring, mutasi, resign'],['Payroll area','Kelompok penggajian'],['Control record','Pengendali periode payroll']],
+basis:[['Landscape','DEV → QAS → PRD'],['Work process','Proses server: dialog, background, update'],['Transport request','Paket perubahan antar sistem'],['Short dump','Runtime error ABAP']],
+abap:[['Data Dictionary','Definisi tabel dan struktur'],['BAdI','Titik enhancement'],['BAPI','API bisnis SAP'],['CDS view','Model data S/4HANA']],
+fiori:[['Launchpad','Halaman awal tile Fiori'],['Business catalog','Kumpulan app untuk role'],['OData','Protokol data untuk app'],['Fiori elements','App standar dari anotasi']],
+grc:[['Authorization object','Objek pengendali akses'],['Role (PFCG)','Kumpulan otorisasi'],['SoD','Segregation of duties'],['Firefighter','Akses darurat tercatat']],
+bw:[['DataSource','Sumber ekstraksi'],['aDSO','Objek penyimpanan BW'],['Process chain','Urutan load terjadwal'],['Query','Definisi analisis']],
+pi:[['IDoc','Dokumen elektronik SAP'],['RFC','Remote Function Call'],['iFlow','Alur integrasi Cloud Integration'],['Adapter','Penghubung protokol']],
+sf:[['Employee Central','Inti data karyawan cloud'],['RBP','Role-based permissions'],['Performance form','Formulir penilaian']],
+ariba:[['Ariba Network','Jaringan supplier'],['Sourcing event','Tender RFQ/auction'],['ASN','Advance ship notice']],
+concur:[['Expense report','Laporan biaya dinas'],['Travel request','Persetujuan awal perjalanan'],['Cost object','Cost center/WBS untuk biaya']],
+crm:[['Lead','Minat awal'],['Opportunity','Peluang terkualifikasi'],['Pipeline','Kumpulan peluang'],['SLA','Target waktu layanan']],
+ibp:[['S&OP','Sales & Operations Planning'],['Consensus demand','Forecast yang disepakati'],['MAPE','Ukuran error forecast'],['PIR','Planned independent requirement']]
+};
+
+/* ===================== STUDI KASUS ROLE (lintas modul) ===================== */
+// [roleId, judul, skenario, [[pertanyaan, [benar, fb], [salah, fb], [salah, fb]], ...]]
+const ROLECASE_SRC=[
+['wh','Akhir bulan di Gudang FG','Tanggal 30, gudang FG penuh. Ada 40 delivery yang harus keluar hari ini, 3 truk bahan baku datang, dan cycle count rak 001 menunjukkan selisih 12 karton.',[
+ ['Delivery mana yang diproses dulu?',['Delivery dengan tanggal kirim hari ini, dibuat kolektif dengan VL10 lalu picking FIFO','Tepat. Prioritas tanggal kirim dan proses kolektif.'],['Delivery dengan nilai terbesar saja','Customer lain akan terlambat.'],['Tunggu bahan baku selesai diterima','Pengiriman tertunda tanpa alasan.']],
+ ['Truk bahan baku datang saat staf sibuk picking. Langkah aman?',['GR di MIGO dengan qty sesuai surat jalan, putaway dikonfirmasi setelah barang di rak','Tepat. Stok sistem dan fisik tetap sinkron.'],['Turunkan barang, GR besok','Stok tidak tercatat, MRP salah.'],['GR dulu sesuai PO walau qty berbeda','GR harus sesuai fisik.']],
+ ['Selisih cycle count 12 karton. Sebelum posting selisih?',['Cek TO yang belum dikonfirmasi dan riwayat MB51, lalu recount','Tepat. Selisih sering karena TO belum dikonfirmasi.'],['Langsung posting selisih','Belum diinvestigasi.'],['Abaikan karena kecil','Selisih harus dijelaskan.']]]],
+['inv','Stok tinggi tapi line berhenti','Nilai persediaan naik 18% dalam 3 bulan, tapi produksi berhenti karena kemasan habis. Direktur minta analisis.',[
+ ['Analisis pertama?',['Kelompokkan stok per material dan umur (slow moving, kedaluwarsa) dari MB52/MC.9','Tepat. Cari stok yang menumpuk.'],['Potong semua PO','Bisa memperparah kekurangan.'],['Tambah gudang','Tidak menyelesaikan masalah.']],
+ ['Kemasan habis padahal ada PO. Cek?',['MD04 untuk melihat tanggal PO vs kebutuhan dan exception','Tepat.'],['FBL1N','Itu hutang vendor.'],['VA05','Itu sales order.']],
+ ['Ditemukan 2 batch biskuit mendekati kedaluwarsa. Tindakan?',['Prioritaskan keluar (FEFO), koordinasi sales untuk promosi','Tepat.'],['Biarkan sampai kedaluwarsa','Kerugian penuh.'],['Pindah ke sloc lain','Tidak mengubah umur.']]]],
+['proc','Bahan baku naik, vendor telat','Harga gula naik 12%, vendor utama telat 5 hari, dan Finance mengeluh 9 invoice blocked bulan ini.',[
+ ['Vendor utama telat. Tindakan?',['Follow up PO lewat ME2N WE101, cari alternatif vendor untuk kebutuhan mendesak','Tepat.'],['Batalkan semua PO','Pasokan berhenti.'],['Tunggu saja','Produksi berisiko.']],
+ ['Untuk kontrak gula 6 bulan ke depan?',['Sourcing event kompetitif (RFQ) lalu kontrak','Tepat.'],['Tunjuk langsung vendor termurah tahun lalu','Harga sudah berubah.'],['Beli harian di pasar','Tidak terkontrol.']],
+ ['9 invoice blocked. Penyebab yang paling sering?',['Harga PO tidak diupdate atau GR belum lengkap','Tepat. Cek PO history dan harga PO.'],['Finance salah input semua','Biasanya akar ada di PO/GR.'],['Vendor salah semua','Perlu dicek dulu.']]]],
+['log','Pengiriman Lebaran','Volume kirim naik 2 kali menjelang Lebaran. Truk terbatas dan biaya angkut naik.',[
+ ['Cara mengoptimalkan truk?',['Gabungkan delivery per rute dalam shipment (VT01N)','Tepat.'],['Satu truk per order','Mahal.'],['Kirim setelah Lebaran','Customer kehabisan stok.']],
+ ['Biaya angkut harus dialokasikan.',['Shipment cost (VI01) diteruskan ke FI','Tepat.'],['Dicatat di Excel saja','Tidak masuk laporan biaya.'],['Dibebankan ke customer tanpa kontrak','Tidak sesuai kontrak.']],
+ ['Ada 15 delivery belum PGI sore hari.',['Cek VL06O, pastikan picking selesai lalu PGI','Tepat.'],['Billing dulu','Billing setelah PGI.'],['Hapus delivery','Order tidak terkirim.']]]],
+['sales','Order besar dari key account','Key account memesan 3.000 karton dengan diskon khusus, kirim ke 3 DC, minta tiba dalam 5 hari.',[
+ ['Sebelum janji tanggal kirim?',['Cek ketersediaan (ATP) dan status kredit customer','Tepat.'],['Langsung janji 5 hari','Bisa tidak terpenuhi.'],['Tanya gudang lewat chat saja','Tidak terdokumentasi.']],
+ ['Order masuk credit block.',['Koordinasi dengan credit analyst untuk keputusan rilis','Tepat.'],['Ubah limit sendiri','Melanggar kontrol.'],['Buat order baru','Akan terblok juga.']],
+ ['Diskon khusus harus dipakai.',['Gunakan condition record diskon yang disetujui','Tepat.'],['Ubah harga manual tiap order','Rawan salah dan audit.'],['Tulis di teks order','Tidak dihitung.']]]],
+['ppc','Mesin rusak di tengah minggu','Mesin oven Line 2 rusak 2 hari. Order produksi 6.000 karton minggu ini terancam.',[
+ ['Langkah pertama planner?',['Koordinasi PM untuk estimasi perbaikan, lalu jadwalkan ulang order dan cek kapasitas line lain','Tepat.'],['Biarkan jadwal','Rencana tidak realistis.'],['Batalkan semua order','Berlebihan.']],
+ ['Bahan baku untuk order yang mundur?',['Cek MD04 agar PO bisa ditunda/dimajukan sesuai jadwal baru','Tepat.'],['Biarkan datang','Stok menumpuk.'],['Batalkan PO','Bisa kekurangan nanti.']],
+ ['Order yang sudah dimulai harus dihentikan sebagian.',['Konfirmasi qty aktual, sisanya dijadwal ulang','Tepat.'],['TECO tanpa konfirmasi','Biaya dan stok salah.'],['Hapus order','Riwayat hilang.']]]],
+['qc','Keluhan customer: biskuit melempem','Customer modern trade mengeluhkan 50 karton biskuit melempem dari batch B2611.',[
+ ['Dokumen pertama?',['Quality notification Q1 dengan batch B2611','Tepat.'],['Q2','Itu ke vendor.'],['Email saja','Tidak terdokumentasi.']],
+ ['Telusuri bahan yang dipakai batch tersebut.',['Batch where-used / traceability','Tepat.'],['MB52','Hanya stok sekarang.'],['ME2N','Daftar PO.']],
+ ['Ternyata kemasan dari vendor X bocor.',['Q2 ke vendor dan perketat inspeksi GR kemasan','Tepat.'],['Ganti vendor tanpa data','Perlu bukti.'],['Tidak ada tindakan','Masalah berulang.']]]],
+['mp','Breakdown berulang','Conveyor Line 3 breakdown 4 kali bulan ini karena bearing.',[
+ ['Data untuk analisis?',['Riwayat notifikasi & order di IW38/IW28 untuk equipment itu','Tepat.'],['MB52','Hanya stok.'],['F110','Tidak terkait.']],
+ ['Pencegahan?',['Tambah maintenance plan pelumasan/ganti bearing berkala','Tepat.'],['Tunggu rusak lagi','Reaktif.'],['Beli conveyor baru langsung','Belum dianalisis.']],
+ ['Bearing sering kosong saat dibutuhkan.',['Koordinasi safety stock/reorder point dengan inventory','Tepat.'],['Simpan di laci teknisi','Stok tak tercatat.'],['Beli tiap ada kerusakan','Lambat.']]]],
+['proj','Proyek renovasi mendekati over budget','Renovasi Mixing: budget 1,2 M, actual 900 jt, komitmen 260 jt. Supervisor minta PR tambahan 80 jt.',[
+ ['Sisa budget bebas?',['Rp 40 jt, PR 80 jt melebihi','Tepat. 1.200 − 900 − 260 = 40.'],['Rp 300 jt','Komitmen belum dikurangi.'],['Rp 120 jt','Salah hitung.']],
+ ['Tindakanmu?',['Eskalasi ke supervisor/pemilik budget sebelum PR dibuat','Tepat.'],['Buat PR saja','Over budget.'],['Pecah PR jadi kecil','Menghindari kontrol.']],
+ ['Ditemukan biaya proyek masuk cost center produksi.',['Telusuri KSB1 dan minta koreksi posting ke WBS','Tepat.'],['Biarkan','Biaya proyek tidak lengkap.'],['Catat di Excel','SAP tetap salah.']]]],
+['scp','Siklus S&OP bulan ini','Forecast biskuit bias +15% tiga bulan berturut-turut; kapasitas produksi terbatas.',[
+ ['Tindakan untuk forecast?',['Review model statistik dan input sales di demand review','Tepat.'],['Biarkan','Stok berlebih.'],['Turunkan semua 15% tanpa analisis','Bisa salah untuk SKU lain.']],
+ ['Demand melebihi kapasitas.',['Supply review: skenario lembur, outsourcing, atau prioritas SKU','Tepat.'],['Abaikan kapasitas','Rencana tidak realistis.'],['Tolak semua order baru','Kehilangan penjualan.']],
+ ['Rencana disetujui di executive S&OP.',['Kirim PIR ke S/4 untuk MRP','Tepat.'],['Email rencana ke gudang','Tidak terintegrasi.'],['Simpan di Excel','Tidak dieksekusi.']]]],
+['svc','Kontrak servis yang terlupa','Customer mengklaim kunjungan servis kuartal ini gratis sesuai kontrak, teknisi sudah menagih.',[
+ ['Cek?',['Service contract (VA43) dan cakupan equipment','Tepat.'],['Saldo bank','Tidak terkait.'],['MB52','Tidak terkait.']],
+ ['Kontrak memang mencakup kunjungan ini.',['Batalkan tagihan dan koreksi billing','Tepat.'],['Tetap tagih','Melanggar kontrak.'],['Diskon 50%','Tetap salah.']],
+ ['Agar tidak terulang?',['Pastikan service order terhubung ke kontrak sehingga billing otomatis benar','Tepat.'],['Ingatkan teknisi lisan','Tidak sistemik.'],['Hapus kontrak','Salah.']]]],
+['fin','Tutup buku Oktober','Hari kerja ke-2 bulan November. GR/IR besar, beberapa accrual belum dibuat, dan aset baru belum disusutkan.',[
+ ['Urutan yang benar?',['Cut-off → accrual → depresiasi → revaluasi → settlement → tutup periode','Tepat.'],['Tutup periode dulu','Posting tertunda tidak bisa masuk.'],['Laporan dulu baru accrual','Angka belum lengkap.']],
+ ['Aset baru belum disusutkan.',['Pastikan kapitalisasi lalu jalankan AFAB','Tepat.'],['Jurnal manual penyusutan','Sub-ledger aset tidak sinkron.'],['Tunda ke tahun depan','Laporan salah.']],
+ ['Saldo GR/IR besar dan lama.',['Analisis per PO: GR tanpa invoice atau invoice tanpa GR, koordinasi dengan purchasing','Tepat.'],['Hapus saldo','Tidak boleh tanpa analisis.'],['Biarkan','Laporan menyesatkan.']]]],
+['apar','Minggu sibuk AP/AR','Hari ini: payment run mingguan, 3 customer membayar tanpa referensi, satu vendor minta ganti rekening.',[
+ ['Sebelum payment run F110?',['Review proposal: invoice blocked, vendor bermasalah, nilai besar','Tepat.'],['Langsung run','Tanpa kontrol.'],['Bayar semua manual','Tidak efisien.']],
+ ['Pembayaran tanpa referensi.',['Cocokkan dengan open item FBL5N dan konfirmasi ke customer','Tepat.'],['Taruh di akun selisih','Unapplied cash menumpuk.'],['Kembalikan uang','Tidak perlu.']],
+ ['Vendor minta ganti rekening.',['Verifikasi lewat kontak resmi dan dual control','Tepat.'],['Ganti langsung','Risiko fraud.'],['Tolak tanpa cek','Pembayaran bisa gagal.']]]],
+['ctrl','Margin turun','Margin kotor biskuit turun 4 poin. CFO minta penjelasan dalam 2 hari.',[
+ ['Analisis pertama?',['Bandingkan standard cost vs actual dan variance production order (KKS2)','Tepat.'],['Potong biaya marketing','Belum tahu penyebab.'],['Ubah harga jual','Prematur.']],
+ ['Variance terbesar di bahan gula.',['Cek harga beli dan pemakaian vs BOM','Tepat.'],['Ubah standard tanpa analisis','Menutupi masalah.'],['Abaikan','Margin terus turun.']],
+ ['Ditemukan biaya utilitas salah alokasi.',['Perbaiki assessment cycle cost center','Tepat.'],['Jurnal manual tiap bulan','Tidak berkelanjutan.'],['Biarkan','Laporan salah.']]]],
+['treas','Kas menipis','Forecast menunjukkan kas negatif dalam 3 minggu karena piutang besar belum masuk.',[
+ ['Data forecast?',['FF7B liquidity forecast dari AP, AR, PO, SO','Tepat.'],['MB52','Tidak terkait.'],['Saldo hari ini saja','Tidak cukup.']],
+ ['Piutang besar overdue.',['Koordinasi collections: worklist & promise to pay','Tepat.'],['Tunggu','Kas makin tipis.'],['Write-off','Belum perlu.']],
+ ['Customer berisiko memesan lagi.',['Tinjau credit limit dan risk class','Tepat.'],['Naikkan limit','Risiko naik.'],['Abaikan','Exposure bertambah.']]]],
+['hr','Payroll bulan ini','Ada 12 karyawan baru, 3 promosi, dan perubahan tarif BPJS bulan ini.',[
+ ['Urutan aman?',['Lengkapi personnel action & infotype → release → simulasi → run → exit','Tepat.'],['Run langsung','Data belum lengkap.'],['Exit dulu','Periode tertutup.']],
+ ['Promosi berlaku tanggal 15.',['Copy 0008/0001 dengan tanggal mulai 15','Tepat.'],['Change record lama','Riwayat hilang.'],['Bayar manual','Tidak tercatat.']],
+ ['Setelah payroll selesai?',['Posting ke FI dan file transfer bank','Tepat.'],['Hanya cetak slip','Gaji tidak dibayar.'],['Hapus hasil','Salah.']]]],
+['abap','Laporan stok lambat','Laporan custom stok berjalan 25 menit dan sering dump di akhir bulan.',[
+ ['Langkah pertama?',['Cek ST22 untuk dump dan analisis performa (SQL trace/ATC)','Tepat.'],['Tambah server','Belum tahu penyebab.'],['Hapus laporan','User butuh.']],
+ ['Ditemukan SELECT di dalam LOOP.',['Ambil data sekaligus (JOIN/FOR ALL ENTRIES) atau CDS','Tepat.'],['Biarkan','Tetap lambat.'],['Pindah ke background tanpa perbaikan','Masalah tetap.']],
+ ['User minta versi Fiori.',['Fiori elements dari CDS view','Tepat.'],['Screenshot laporan','Tidak interaktif.'],['SAPscript','Untuk form cetak.']]]],
+['basis','Pagi yang kacau','Pagi ini: 5 job gagal, user tidak bisa login, dan ada request transport darurat.',[
+ ['Prioritas pertama?',['Masalah login (dampak luas): cek SM21, lock user, sistem','Tepat.'],['Transport darurat','Bisa menunggu.'],['Job laporan','Dampak lebih kecil.']],
+ ['Job gagal.',['Cek SM37 log, perbaiki penyebab, jadwalkan ulang','Tepat.'],['Hapus job','Laporan hilang.'],['Abaikan','Data basi.']],
+ ['Transport darurat ke PRD.',['Pastikan diuji di QAS dan disetujui sebelum import','Tepat.'],['Import langsung','Risiko.'],['Ubah manual di PRD','Melanggar kontrol.']]]],
+['sec','Audit akses tahunan','Auditor menemukan 4 user dengan kombinasi PO + GR dan 2 user SAP_ALL di PRD.',[
+ ['Laporan untuk bukti?',['SUIM dan Access Risk Analysis','Tepat.'],['MB52','Tidak terkait.'],['SM37','Tidak terkait.']],
+ ['User SAP_ALL.',['Cabut, ganti dengan role sesuai tugas / firefighter','Tepat.'],['Biarkan','Temuan audit.'],['Ganti password','Tidak mengurangi akses.']],
+ ['Konflik PO + GR karena kekurangan staf.',['Mitigasi: review berkala dan approval kompensasi','Tepat.'],['Abaikan','Risiko fraud.'],['Hapus semua akses','Operasional berhenti.']]]],
+['bi','Angka tidak cocok','Dashboard penjualan menunjukkan 5% lebih tinggi daripada laporan Finance.',[
+ ['Langkah pertama?',['Rekonsiliasi definisi KPI dan sumber (billing vs order)','Tepat.'],['Ubah dashboard agar sama','Menutupi masalah.'],['Abaikan','Kepercayaan hilang.']],
+ ['Ternyata ada load delta yang dobel.',['Perbaiki request/DTP dan reload data','Tepat.'],['Biarkan','Angka salah.'],['Hapus semua data','Berlebihan.']],
+ ['Agar tidak terulang?',['Monitoring process chain dan cek rekonsiliasi otomatis','Tepat.'],['Cek manual setahun sekali','Terlambat.'],['Tidak perlu','Bisa terulang.']]]]
+];
+const ROLECASES=ROLECASE_SRC.map(([rid,title,scene,steps])=>({id:'r-'+rid,role:rid,kind:'role',title,tag:'Role',scene,
+  steps:steps.map(([q,...o])=>({q:q||'Tindakan yang tepat?',o:shuffle(o.map((x,i)=>[x[0],i===0?1:0,x[1]]))}))}));
 /* ===================== SIMULATOR DATA ===================== */
 const TODAY='04.11.2026';
 const KNOWN={ME51N:'Create Purchase Requisition',ME52N:'Change Purchase Requisition',ME53N:'Display Purchase Requisition',ME5A:'List Display of Purchase Requisitions',ME21N:'Create Purchase Order',ME22N:'Change Purchase Order',ME23N:'Display Purchase Order',ME2N:'Purchasing Documents per Document Number',ME2L:'Purchasing Documents per Vendor',ME2M:'Purchasing Documents per Material',MIGO:'Goods Movement',ML81N:'Service Entry Sheet',MIRO:'Enter Incoming Invoice',MB52:'Display Warehouse Stocks of Material',MMBE:'Stock Overview',MB51:'Material Document List',MB03:'Display Material Document',MM03:'Display Material',MI01:'Create Physical Inventory Document',MI21:'Print Physical Inventory Document',MI04:'Enter Inventory Count',MI11:'Recount',MI20:'List of Inventory Differences',MI07:'Post Inventory Difference',AS03:'Display Asset',AW01N:'Asset Explorer',AR01:'Asset Balances',AIAB:'AuC Distribution Rule',AIBU:'AuC Settlement',CJ20N:'Project Builder',CJI3:'Display Project Actual Cost Line Items',CJI5:'Display Project Commitment Line Items',KSB1:'Display Actual Cost Line Items for Cost Centers',KOB1:'Display Actual Cost Line Items for Orders',IE03:'Display Equipment',IW33:'Display PM Order',IW38:'Change PM Orders: Selection',ME54N:'Release Purchase Requisition',XK03:'Display Vendor',KS03:'Display Cost Center',CJ13:'Display WBS Element',KO03:'Display Internal Order'};
@@ -2518,6 +2854,75 @@ screens:[
 {k:'q',instr:'Berapa total stok 500010 di warehouse 110?',o:['640 CAR','600 CAR','400 CAR','200 CAR'],a:0,e:'160 + 240 + 200 + 40 = 640 CAR.'}
 ]}
 );
+
+/* ===================== PRAKTIK PER BAB, ROLE, UJIAN & LOG NILAI ===================== */
+S.att=S.att||{};S.cpf=S.cpf||{};S.addons=S.addons||[];
+function logAtt(key,score){(S.att[key]=S.att[key]||[]).push({s:Math.round(score),t:Date.now()});save();}
+function attOf(key){const a=S.att[key]||[];return {n:a.length,first:a.length?a[0].s:null,best:a.length?Math.max(...a.map(x=>x.s)):null,last:a.length?a[a.length-1]:null,all:a};}
+const plain=s=>String(s||'').replace(/<[^>]+>/g,'');
+const isCode=c=>/^[A-Z0-9_\-\.\/]+$/.test(c)&&/[A-Z]/.test(c)&&!/XX/.test(c)&&!['SLA','ADT','ESR','ID'].includes(c);
+const NOT_TC=['SLA','ADT','ESR','ID','API'];
+const isNavCode=c=>isCode(c)&&c[0]!=='/'&&c.length<=20&&!NOT_TC.includes(c);
+const rowCodes=r=>r[0].split(' / ').map(x=>x.trim());
+
+/* ---------- daftarkan semua T-code materi ke command field ---------- */
+MODULES.forEach(m=>m.lessons.forEach(l=>(l.tcRows||[]).forEach(r=>rowCodes(r).forEach(c=>{if(isNavCode(c)&&!KNOWN[c])KNOWN[c]=plain(r[1]);}))));
+
+/* ---------- simulator bab ---------- */
+const BAB_SIM={nav:{0:['s20'],2:['s0'],4:['s8']},org:{2:['s9']},'mm-pur':{1:['s1','s21'],3:['s22'],4:['s27'],5:['s12','s2'],6:['s13']},'mm-im':{0:['s3','s23','s24'],1:['s4'],2:['s11'],3:['s10']},'mm-pi':{0:['s14','s15','s25'],1:['s5'],3:['s26']},'fi-aa':{2:['s16'],3:['s7']},ps:{1:['s6','s28'],3:['s17']},'ps-ops':{0:['s19'],3:['s18']},sd:{2:['d1'],3:['d2']},'fi-ap':{1:['f1'],2:['f2']},pp:{1:['p1'],2:['p2']},wm:{0:['w2'],1:['w1']}};
+const APPPRAC={};const BAB={};
+MODULES.forEach(m=>{BAB[m.id]=m.lessons.map((l,i)=>{
+  const mapped=((BAB_SIM[m.id]||{})[i]||[]).filter(id=>SIMS.find(s=>s.id===id));
+  mapped.forEach(id=>{const s=SIMS.find(x=>x.id===id);s.bab=i;s.kind='bab';s.back='modul-'+m.id;});
+  const sims=mapped.slice();let app=null;
+  const nav=[...new Set((l.tcRows||[]).flatMap(r=>rowCodes(r).filter(isNavCode).map(c=>c+'|'+plain(r[1]))))].slice(0,3).map(x=>x.split('|'));
+  const kc=(BABCASE[m.id]||[])[i];
+  if(!sims.length&&nav.length){const id=`b-${m.id}-${i}`;
+    SIMS.push({id,mod:m.id,bab:i,kind:'bab',gen:true,back:'modul-'+m.id,lvl:'Bab '+(i+1),title:`Bab ${i+1}: ${l.t}`,
+      brief:{from:'Latihan bab '+(i+1)+' · '+m.code,msg:(kc?kc[0]+' ':'')+'Tugasmu: buka transaksi yang tepat untuk setiap kebutuhan di panel Tugas, lalu jawab pertanyaan penutup.'},
+      steps:[...nav.map(([c,d],k)=>({k:'nav',tc:c,pre:null,instr:`Buka transaksi untuk: ${d}.${k?' Kamu sedang di dalam transaksi, jadi pakai /n + T-code.':''} Petunjuk: lihat tabel T-code di bab ${i+1}.`})),
+        {k:'q',instr:l.cp.q,o:l.cp.o,a:l.cp.a,e:l.cp.e}]});sims.push(id);}
+  else if(!sims.length){app=`a-${m.id}-${i}`;APPPRAC[app]={id:app,mod:m.id,bab:i,title:`Bab ${i+1}: ${l.t}`,rows:(l.tcRows||[]).map(r=>[r[0],plain(r[1])]),flow:l.flow};}
+  /* studi kasus bab */
+  const steps=[];
+  if(kc)steps.push({q:kc[1],o:shuffle(kc.slice(2).map((x,j)=>[x[0],j===0?1:0,x[1]]))});
+  const rows=(l.tcRows||[]);const others=m.lessons.flatMap((x,j)=>j===i?[]:(x.tcRows||[])).concat(rows.slice(1));
+  if(rows.length&&others.length>=2){const r=rows[0];const ds=shuffle(others.filter(o=>o[0]!==r[0])).slice(0,2);
+    steps.push({q:`Untuk kebutuhan "${plain(r[1])}", transaksi/app mana yang kamu pakai?`,o:shuffle([[r[0],1,'Tepat. '+plain(r[1])+'.'],...ds.map(d=>[d[0],0,`${d[0]} dipakai untuk: ${plain(d[1])}.`])])});}
+  const cs={id:`bc-${m.id}-${i}`,kind:'bab',mod:m.id,bab:i,title:`Bab ${i+1}: ${l.t}`,tag:m.code,scene:kc?kc[0]:l.cp.q,steps,back:'modul-'+m.id};
+  return {sims,app,case:cs};});});
+const BABCASES=MODULES.flatMap(m=>BAB[m.id].map(b=>b.case));
+
+/* ---------- simulator & studi kasus role ---------- */
+const ROLESIM={};
+ROLES.forEach(r=>{
+  const mods=[...r.w,...r.g.filter(x=>x!=='nav'&&x!=='org')].slice(0,4);const steps=[];const briefs=[];
+  for(const mid of mods){if(briefs.length>=3)break;
+    const full=SIMS.find(s=>s.mod===mid&&!s.kase&&!s.gen&&!s.forceLogon&&s.kind==='bab'&&!['s0','s8','s19'].includes(s.id));
+    if(full){briefs.push(`(${briefs.length+1}) ${MOD[mid].code} – ${full.brief.from}: ${full.brief.msg}`);steps.push(...full.steps);}
+    else{const rows=MOD[mid].lessons.flatMap(l=>l.tcRows||[]);const codes=[...new Set(rows.flatMap(r=>rowCodes(r).filter(isNavCode).map(c=>c+'|'+plain(r[1]))))].slice(0,2).map(x=>x.split('|'));
+      if(!codes.length)continue;const q=MOD[mid].quiz[0];
+      briefs.push(`(${briefs.length+1}) ${MOD[mid].code}: cek cepat transaksi ${codes.map(c=>c[0]).join(' dan ')} lalu jawab satu pertanyaan.`);
+      steps.push(...codes.map(([c,d])=>({k:'nav',tc:c,pre:null,instr:`${MOD[mid].code}: buka transaksi untuk ${d}. Dari dalam transaksi pakai /n.`})),{k:'q',instr:q.q,o:q.o,a:q.a,e:q.e});}}
+  if(!steps.length)return;
+  const id='rs-'+r.id;SIMS.push({id,role:r.id,kind:'role',mod:null,back:'jalur',lvl:'Role',title:`Satu hari kerja: ${r.t}`,brief:{from:'Hari kerja sebagai '+r.t,msg:briefs.join(' ')},steps});ROLESIM[r.id]=id;});
+function roleSims(r){const path=rolePath(r);return [ROLESIM[r.id],...SIMS.filter(s=>s.kase&&path.includes(s.mod)).map(s=>s.id)].filter(Boolean);}
+function roleCases(r){const path=rolePath(r);return [...ROLECASES.filter(c=>c.role===r.id),...CASES.filter(c=>path.includes(c.mod))];}
+CASES.forEach(c=>{c.kind='role';});
+SIMS.filter(s=>s.kase).forEach(s=>{s.kind='role';s.back='jalur';});
+const ALLCASES=[...CASES,...ROLECASES,...BABCASES];
+
+/* ---------- ujian akhir modul & role ---------- */
+function tcQs(m,n){const rows=m.lessons.flatMap(l=>l.tcRows||[]);if(rows.length<4)return [];return shuffle(rows).slice(0,n).map(r=>{const ds=shuffle(rows.filter(x=>x!==r)).slice(0,3).map(x=>x[0]);return cp(`T-code/app untuk: ${plain(r[1])}?`,[r[0],...ds],0,`${r[0]} = ${plain(r[1])}.`);});}
+function modExamPool(m){return [...m.quiz,...m.lessons.map(l=>l.cp),...tcQs(m,3)].map(q=>Object.assign({},q,{mod:m.id}));}
+function roleExamPool(r){return roleCore(r).flatMap(id=>modExamPool(MOD[id]));}
+
+/* ---------- glosarium ---------- */
+const MVT=[['101','GR terhadap PO'],['102','Pembatalan GR'],['201','GI ke cost center'],['202','Pembatalan 201'],['221','GI ke proyek/WBS'],['222','Pembatalan 221'],['261','GI ke order'],['262','Pembatalan 261'],['311','Transfer antar sloc'],['601','GI untuk delivery penjualan'],['651','GR retur customer']];
+const GLOSS=(()=>{const map={};const add=(k,d,t,mid)=>{const key=t+'|'+k;if(!map[key])map[key]={k,d,t,mods:[]};if(!map[key].mods.includes(mid))map[key].mods.push(mid);};
+  MODULES.forEach(m=>{m.lessons.forEach(l=>(l.tcRows||[]).forEach(r=>rowCodes(r).forEach(c=>add(c,plain(r[1]),isCode(c)?'T-code':'App',m.id))));(TERMS[m.id]||[]).forEach(([k,d])=>add(k,d,'Istilah',m.id));});
+  MVT.forEach(([k,d])=>add(k,d,'Movement type','mm-im'));
+  return Object.values(map).sort((a,b)=>a.k.localeCompare(b.k));})();
 /* ===================== SIMULATOR ENGINE ===================== */
 let SIM=null; let LOGGED=false; const LOGON_USER='ANDRE.P';
 const stepOf=()=>SIM&&!SIM.free?SIM.sc.steps[SIM.step]:null;
@@ -2981,7 +3386,7 @@ function guiBodyH(){
       <li><button data-tree="0" aria-expanded="${!!SIM.tree[0]}"><span style="width:9px;font-size:9px">${SIM.tree[0]?'▼':'▶'}</span>${SIM.tree[0]?ICO.folderO:ICO.folder}SAP Menu</button>${SIM.tree[0]?treeH(TREE,'0'):''}</li></ul></div>
       <div class="ea-pic">Akademi SAP · training client 800</div></div>`;
   }
-  if(SIM.where==='other'){return `<div class="scr-note">Layar <b>${esc(SIM.other)} – ${esc(KNOWN[SIM.other]||'')}</b> terbuka.<br>Simulator tidak melatih isi layar ini${stepOf()&&stepOf().k==='nav'?'; fokus langkah ini adalah cara berpindah transaksi':''}. Pakai command field: <code>/n</code> + T-code (jendela yang sama), <code>/o</code> + T-code (jendela baru), atau <code>/n</code> saja untuk kembali.</div>`;}
+  if(SIM.where==='other'){return `<div class="scr-note">Layar <b>${esc(SIM.other)} – ${esc(KNOWN[SIM.other]||'')}</b> terbuka.<br>${SIM.sc&&SIM.sc.gen?'Transaksi yang benar sudah terbuka. Isi layar transaksi ini dilatih di skenario lengkap (simulator role dan bab lain)':'Simulator tidak melatih isi layar ini'}${stepOf()&&stepOf().k==='nav'?'; fokus langkah ini adalah memilih dan membuka transaksi yang tepat':''}. Pakai command field: <code>/n</code> + T-code (jendela yang sama), <code>/o</code> + T-code (jendela baru), atau <code>/n</code> saja untuk kembali.</div>`;}
   const scr=scrOf(); return blocksOf(scr).map(blockH).join('');
 }
 function appBarH(){
@@ -3021,7 +3426,7 @@ function drawSim(){
   const a=document.activeElement; const focusId=a&&a.dataset?(a.dataset.f||(a.dataset.lv?'lv:'+a.dataset.lv:null)||a.id):null; const selPos=a&&(a.type==='text')?a.selectionStart:null;
   computeNext();
   const v=$('#view');
-  v.innerHTML=`<div class="spread"><div><div class="eyebrow">${SIM.free?'Simulator SAP GUI · Mode bebas':SIM.sc.kase?'Studi kasus + praktik SAP · '+MOD[SIM.sc.mod].code:'Simulator SAP GUI · '+MOD[SIM.sc.mod].code}</div><h1 style="font-size:28px">${esc(SIM.sc.title)}</h1></div><a class="btn ghost sm" href="#${SIM.sc.kase?'studi-kasus':'simulator'}" id="simExit">← ${SIM.sc.kase?'Studi kasus':'Daftar skenario'}</a></div>
+  v.innerHTML=`<div class="spread"><div><div class="eyebrow">${SIM.free?'Simulator SAP GUI · Mode bebas':SIM.sc.kind==='role'&&!SIM.sc.mod?'Simulator role · '+(ROLES.find(r=>r.id===SIM.sc.role)||{}).t:SIM.sc.kase?'Studi kasus + praktik SAP · '+MOD[SIM.sc.mod].code:'Simulator SAP GUI · '+MOD[SIM.sc.mod].code+(SIM.sc.bab!=null?' · Bab '+(SIM.sc.bab+1):'')}</div><h1 style="font-size:28px">${esc(SIM.sc.title)}</h1></div><a class="btn ghost sm" href="#${SIM.sc.back||(SIM.sc.kase?'studi-kasus':'simulator')}" id="simExit">← ${SIM.sc.back&&SIM.sc.back.startsWith('modul-')?'Kembali ke modul':SIM.sc.back==='jalur'?'Jalur saya':SIM.sc.kase?'Studi kasus':'Daftar skenario'}</a></div>
   <div class="sim-layout" style="margin-top:14px">
     <div class="coach" id="coach">${coachH()}</div>
     <div class="gui ${S.simMode==='guided'?'guided':''}" id="gui">
@@ -3100,7 +3505,7 @@ function nextStep(){
   if(st.k==='tx'||st.k==='nav'){SIM.txDone=false; if(SIM.where!=='logon')setMsg('I',SIM.where==='easy'?'SAP Easy Access':'Ready',null);}
   drawSim();
 }
-function finishSim(){SIM.done=true;const stars=SIM.errors===0&&SIM.hints===0?3:SIM.errors<=3?2:1;const k=SIM.sc.id;const prev=typeof S.sims[k]==='number'?S.sims[k]:(S.sims[k]?1:0);S.sims[k]=Math.max(prev,stars);save();renderNav('simulator');}
+function finishSim(){SIM.done=true;const stars=SIM.errors===0&&SIM.hints===0?3:SIM.errors<=3?2:1;const k=SIM.sc.id;const prev=typeof S.sims[k]==='number'?S.sims[k]:(S.sims[k]?1:0);S.sims[k]=Math.max(prev,stars);logAtt('sim:'+k,stars);save();renderNav('simulator');}
 document.addEventListener('keydown',e=>{
   if(!SIM||!$('#gui')) return;
   const inDlg=e.target.closest&&e.target.closest('.dlg');
@@ -3123,33 +3528,39 @@ document.addEventListener('keydown',e=>{
 });
 function renderSimHome(){
   SIM=null;
-  const list=SIMS.filter(s=>!s.kase);const done=list.filter(s=>simStars(s.id)>0).length;const byMod={};list.forEach(s=>(byMod[s.mod]=byMod[s.mod]||[]).push(s));
-  const r=roleOf();const mods=MODULES.filter(m=>byMod[m.id]);
-  const mine=r?mods.filter(m=>relOf(m.id,r)):[];const other=mods.filter(m=>!mine.includes(m));
-  const sec=m=>`<h3 style="margin:22px 0 8px;font-size:18px;font-weight:500">${esc(m.code)} · ${esc(m.title)} ${relPill(relOf(m.id))}</h3><div class="scen-list">${byMod[m.id].map(simCard).join('')}</div>`;
+  const r=roleOf();const bab=SIMS.filter(s=>s.kind==='bab');const done=SIMS.filter(s=>simStars(s.id)>0).length;
+  const mods=MODULES.filter(m=>BAB[m.id].some(b=>b.sims.length||b.app));
+  const mine=r?mods.filter(m=>relOf(m.id,r)||S.addons.includes(m.id)):[];const other=mods.filter(m=>!mine.includes(m));
+  const modBlock=m=>{const items=BAB[m.id].map((b,i)=>[...b.sims.map(id=>simCard(SIMS.find(x=>x.id===id))),b.app?appCard(b.app):''].join('')).join('');
+    const n=BAB[m.id].filter(b=>b.sims.some(id=>simStars(id)>0)||(b.app&&simStars(b.app)>0)).length;
+    return `<details class="simgrp"><summary><b>${esc(m.code)}</b> ${esc(shortT(m))} ${relPill(relOf(m.id))}<span class="muted" style="margin-left:auto;font-size:13px">${n}/${m.lessons.length} bab dipraktikkan</span></summary><div class="scen-list" style="margin:10px 0 4px">${items}</div></details>`;};
   $('#view').innerHTML=`<div class="eyebrow">Praktik</div><h1>Simulator SAP GUI</h1>
-  <p class="lead">${list.length} skenario latihan dengan tampilan seperti SAP GUI: layar logon, menu bar, toolbar, command field, title bar, tab, table control, popup F4, ALV, dan status bar. Setiap skenario diawali permintaan nyata dari rekan kerja. Selesai: <b>${done}/${SIMS.filter(s=>!s.kase).length}</b>.</p>
+  <p class="lead">Ada tiga jenis latihan: <b>simulator role</b> (satu hari kerja lintas modul sesuai role), <b>simulator per bab</b> (sesuai isi setiap bab di modul), dan <b>Mode bebas</b>. ${done} latihan sudah kamu selesaikan.</p>
   <div class="card" style="margin-top:14px;border:2px solid var(--accent)"><div class="spread"><div><div class="eyebrow">Mode bebas</div><b style="font-family:var(--font-d);font-size:20px">Latihan SAP sesukamu, tanpa skenario</b><p style="margin:4px 0 0;max-width:70ch">Sistem latihan dengan data yang saling terhubung: buat PR, setujui jadi PO, terima barang, keluarkan ke proyek, pindahkan stok, batalkan dokumen, lalu lihat dampaknya di stok dan biaya proyek. SAP akan menolak isian yang salah seperti aslinya.</p></div><button class="btn" id="freeBtn">Buka Mode bebas</button></div></div>
   <div class="grid g2" style="margin-top:12px">
    <div class="callout" style="margin:0"><b>Cara main</b>Login sekali per sesi browser (client 800). Ketik T-code di command field (contoh <code>ME51N</code>, dari dalam transaksi <code>/nMIGO</code>) atau double-click di Favorites/SAP Menu. Shortcut: <code>Enter</code>, <code>F8</code>, <code>Ctrl+S</code>, <code>F3</code>, <code>F4</code>, <code>F12</code>, <code>Shift+F5</code>. Menu <b>System → Status</b> juga berfungsi.</div>
    <div class="callout warn" style="margin:0"><b>Dua mode</b>Panduan: checklist field, sorotan field berikutnya, label di toolbar ALV, penjelasan pesan. Ujian: tanpa bantuan dan ikon saja, seperti di SAP asli.</div>
   </div>
   
-  ${r?`<h2>Untuk jalur ${esc(r.t)}</h2>${mine.length?mine.map(sec).join(''):'<p class="muted">Belum ada skenario simulator untuk modul jalurmu. Modul teknis dan cloud dipelajari lewat materi dan kuis.</p>'}<h2>Modul lain</h2>`:'<h2>Semua skenario per modul</h2>'}
-  ${other.map(sec).join('')}
-  <p class="muted" style="font-size:13px;margin-top:22px">Simulator meniru alur dan susunan layar SAP GUI dengan ikon buatan sendiri. Detail tampilan bisa berbeda di sistem perusahaanmu (ECC/S/4HANA, tema GUI, layout yang dikustomisasi). Latihan pada sistem asli tetap paling baik di client QAS/training.</p>`;
+  
+  ${r?`<h2>Simulator role: ${esc(r.t)}</h2><div class="scen-list">${roleSims(r).map(id=>simCard(SIMS.find(x=>x.id===id))).join('')}</div>`:`<div class="outpath" style="margin-top:18px">Pilih role untuk membuka simulator role (satu hari kerja). <a href="#role">Pilih role</a></div>`}
+  <h2>Simulator per bab</h2><p class="muted" style="max-width:72ch">Setiap bab di setiap modul punya latihannya sendiri. Bab yang memakai SAP GUI berisi transaksi lengkap atau latihan memilih transaksi; bab aplikasi cloud berisi latihan alur dan aplikasi.</p>
+  ${mine.length?`<h3 style="margin:16px 0 8px;font-size:17px;font-weight:500">Modul jalurmu</h3>${mine.map(modBlock).join('')}<h3 style="margin:22px 0 8px;font-size:17px;font-weight:500">Modul lain</h3>`:''}
+  ${other.map(modBlock).join('')}
+  <p class="muted" style="font-size:13px;margin-top:22px">Simulator meniru alur dan susunan layar SAP GUI dengan ikon buatan sendiri. Detail tampilan bisa berbeda di sistem perusahaanmu.</p>`;
   bindSimCards();
   $('#freeBtn').onclick=()=>startFree();
 }
 function simCard(s){const stars=simStars(s.id);return `<button class="scen" data-sim="${s.id}"><span class="row"><span class="pill">${s.lvl}</span>${stars?`<span class="pill ok">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</span>`:''}</span><b>${esc(s.title)}</b><small>${[...new Set(s.steps.filter(x=>!['q','act'].includes(x.k)).map(x=>x.k==='logon'?'Logon':(x.tc||'/n')))].join(' → ')} · ${s.steps.length} langkah</small></button>`;}
-function bindSimCards(){$$('[data-sim]').forEach(b=>b.onclick=()=>startSim(b.dataset.sim));}
+function bindSimCards(){$$('[data-sim]').forEach(b=>b.onclick=()=>startSim(b.dataset.sim));$$('[data-app]').forEach(b=>b.onclick=()=>playApp(b.dataset.app));}
 /* ===================== MASTERY & PROGRESS ===================== */
 function simStars(id){const r=S.sims[id];return typeof r==='number'?r:(r?1:0);}
+function babState(mid,i){const b=BAB[mid][i];return {sim:b.sims.some(id=>simStars(id)>0)||(!!b.app&&simStars(b.app)>0),kasus:S.cases[b.case.id]!=null,b};}
 function mastery(m){
   const L=m.lessons.length, les=Math.min(S.les[m.id]||0,L), q=S.mq[m.id]||0;
-  const sims=SIMS.filter(s=>s.mod===m.id); const prac=sims.length?sims.some(s=>simStars(s.id)>0):true;
-  const pct=Math.round(les/L*50+(q>=80?30:q/80*30*0.5)+(sims.length?(prac?20:0):20*(les>=L&&q>=80?1:0)));
-  return {L,les,q,qok:q>=80,prac,hasSim:sims.length>0,sims,done:les>=L&&q>=80&&prac,pct};
+  const bs=m.lessons.map((_,i)=>babState(m.id,i)); const simB=bs.filter(x=>x.sim).length, caseB=bs.filter(x=>x.kasus).length;
+  const pct=Math.round(les/L*40+simB/L*15+caseB/L*15+(q>=80?30:q/80*15));
+  return {L,les,q,qok:q>=80,simB,caseB,done:les>=L&&q>=80,pct,ex:attOf('mx:'+m.id)};
 }
 function roleCore(r){return [...new Set([...r.g.filter(x=>x==='nav'||x==='org'),...r.w,...r.g])];}
 function progress(){
@@ -3157,33 +3568,37 @@ function progress(){
   const ms=core.map(id=>mastery(MOD[id])); const done=ms.filter(x=>x.done).length;
   const pct=Math.round(ms.reduce((a,x)=>a+x.pct,0)/ms.length);
   const all=MODULES.filter(m=>mastery(m).done).length;
-  const s=SIMS.filter(x=>simStars(x.id)>0).length, c=Object.keys(S.cases).length, k=Object.values(S.cards).filter(Boolean).length;
+  const s=SIMS.filter(x=>simStars(x.id)>0).length+Object.keys(APPPRAC).filter(id=>simStars(id)>0).length, c=Object.keys(S.cases).length, k=Object.values(S.cards).filter(Boolean).length;
   const q=r?((S.quiz.r||{})[r.id]||0):(S.quiz.best||0);
   return {core:core.length,done,pct,all,s,c,k,q,r};
 }
 const shortT=m=>m.title.includes(' – ')?m.title.split(' – ').slice(1).join(' – '):m.title;
 const catName=id=>(CATS.find(c=>c.id===id)||{}).t||'';
 const durMin=ids=>ids.reduce((a,id)=>a+(parseInt(MOD[id].dur)||0),0);
+const fmtD=t=>t?new Date(t).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'–';
+const sc=v=>v==null?'–':v+'%';
 function rolesFor(mid,k){return ROLES.filter(r=>r[k].includes(mid));}
+function nextIn(ids){return ids.map(id=>MOD[id]).find(m=>!mastery(m).done);}
 
 /* ===================== NAV & ROUTER ===================== */
 function renderNav(cur){
   const r=roleOf(), p=progress();
   const it=(h,t,n,badge)=>`<a href="#${h}" class="${cur===h?'on':''}"><span class="num">${n}</span><span>${t}</span>${badge||''}</a>`;
   const mb=m=>{const M=mastery(m);return M.done?'<span class="done">✓</span>':(M.les?`<span class="part">${M.les}/${M.L}</span>`:'');};
+  const mi=(id,k)=>{const m=MOD[id];return `<a href="#modul-${id}" class="${cur==='modul-'+id?'on':''}" title="${REL[k][0]}"><span class="rdot ${k==='a'?'p':k}"></span><span class="num code">${m.code}</span><span>${esc(shortT(m))}</span>${mb(m)}</a>`;};
   let h='<div class="nav-group">Mulai</div>'+it('beranda','Beranda','⌂')+it('jalur','Jalur saya','→',r?`<span class="part">${p.done}/${p.core}</span>`:'')+it('role',r?'Ganti role':'Pilih role','R')+it('modul','Katalog modul','≡',`<span class="part">${MODULES.length}</span>`);
-  if(r) h+=`<div class="nav-group">Modul jalurmu</div>`+rolePath(r).map(id=>{const m=MOD[id],k=relOf(id,r);return `<a href="#modul-${id}" class="${cur==='modul-'+id?'on':''}" title="${REL[k][0]}"><span class="rdot ${k}" aria-label="${REL[k][0]}"></span><span class="num code">${m.code}</span><span>${esc(shortT(m))}</span>${mb(m)}</a>`;}).join('');
-  else h+=`<div class="nav-group">Modul</div><a href="#role" class="${''}"><span class="num">i</span><span style="color:var(--meta)">Pilih role agar modulmu tampil di sini</span></a>`;
-  if(cur.startsWith('modul-')&&(!r||!relOf(cur.slice(6),r))){const m=MOD[cur.slice(6)];if(m)h+=`<div class="nav-group">Sedang dibuka</div><a href="#${cur}" class="on"><span class="num code">${m.code}</span><span>${esc(shortT(m))}</span>${mb(m)}</a>`;}
-  const d=SIMS.filter(x=>!x.kase&&simStars(x.id)>0).length, ns=SIMS.filter(x=>!x.kase).length;
-  h+='<div class="nav-group">Praktik</div>'+it('simulator','Simulator SAP GUI','SIM',d?`<span class="part">${d}/${ns}</span>`:'')+it('studi-kasus','Studi Kasus','SK')+
-     '<div class="nav-group">Uji & hafalan</div>'+it('kuis','Kuis & Ujian','Q')+it('flashcard','Flashcard T-code','FC')+
-     '<div class="nav-group">Referensi</div>'+it('referensi','Cheat sheet','REF');
+  if(r) h+=`<div class="nav-group">Modul jalurmu</div>`+rolePath(r).map(id=>mi(id,relOf(id,r))).join('');
+  else h+=`<div class="nav-group">Modul</div><a href="#role"><span class="num">i</span><span style="color:var(--meta)">Pilih role agar modulmu tampil di sini</span></a>`;
+  const adds=S.addons.filter(id=>!r||!relOf(id,r));if(adds.length)h+=`<div class="nav-group">Add-on</div>`+adds.map(id=>mi(id,'a')).join('');
+  if(cur.startsWith('modul-')&&!relOrAdd(cur.slice(6))){const m=MOD[cur.slice(6)];if(m)h+=`<div class="nav-group">Sedang dibuka</div><a href="#${cur}" class="on"><span class="num code">${m.code}</span><span>${esc(shortT(m))}</span>${mb(m)}</a>`;}
+  h+='<div class="nav-group">Praktik</div>'+it('simulator','Simulator SAP GUI','SIM')+it('studi-kasus','Studi Kasus','SK')+
+     '<div class="nav-group">Uji & hafalan</div>'+it('kuis','Ujian','Q')+it('flashcard','Flashcard','FC')+it('glosarium','Glosarium','GL')+
+     '<div class="nav-group">Hasil & referensi</div>'+it('report','Report nilai','RP')+it('referensi','Cheat sheet','REF');
   $('#nav').innerHTML=h;
-  $('#sideProg').innerHTML=`<b>${r?'Jalur '+esc(r.t):'Progres belajar'}</b> <span style="float:right" class="mono">${p.pct}%</span><div class="bar"><i style="width:${p.pct}%"></i></div><div style="margin-top:6px;color:var(--muted);font-size:12px">${r?`${p.done}/${p.core} modul inti dikuasai`:`${p.all}/${MODULES.length} modul dikuasai`} · ${p.s} simulasi · ${p.c} kasus</div>`;
+  $('#sideProg').innerHTML=`<b>${r?'Jalur '+esc(r.t):'Progres belajar'}</b> <span style="float:right" class="mono">${p.pct}%</span><div class="bar"><i style="width:${p.pct}%"></i></div><div style="margin-top:6px;color:var(--muted);font-size:12px">${r?`${p.done}/${p.core} modul kompetensi dikuasai`:`${p.all}/${MODULES.length} modul dikuasai`} · ${p.s} latihan · ${p.c} kasus</div>`;
   const br=$('#brandRole'); if(br) br.textContent=r?r.t:'Semua role & modul';
 }
-let MODV=null;
+let MODV=null, JV='komp';
 function route(){
   const h=(location.hash||'#beranda').slice(1);
   if(h!=='simulator') SIM=null;
@@ -3196,15 +3611,18 @@ function route(){
   else if(h==='modul') renderCatalog();
   else if(h==='simulator'){ if(!SIM) renderSimHome(); }
   else if(h==='kuis') renderQuizHome();
-  else if(h==='flashcard') renderCards();
+  else if(h==='flashcard') renderCards($('#view'));
+  else if(h==='glosarium') renderGloss($('#view'));
   else if(h==='studi-kasus') renderCaseHome();
+  else if(h==='report') renderReport();
   else if(h==='referensi') renderRef();
   else {renderHome();nav='beranda';}
   renderNav(nav); renderCrumb(nav);
   $('#side').classList.remove('open');
 }
 window.addEventListener('hashchange',route);
-function renderCrumb(h){const el=$('#crumb');if(!el)return;const L={simulator:'Simulator SAP GUI','studi-kasus':'Studi Kasus',kuis:'Kuis & Ujian',flashcard:'Flashcard T-code',referensi:'Cheat sheet',role:'Pilih role',jalur:'Jalur saya',modul:'Katalog modul'};
+function go(h){if(location.hash==='#'+h)route();else location.hash=h;}
+function renderCrumb(h){const el=$('#crumb');if(!el)return;const L={simulator:'Simulator SAP GUI','studi-kasus':'Studi Kasus',kuis:'Ujian',flashcard:'Flashcard',glosarium:'Glosarium',report:'Report nilai',referensi:'Cheat sheet',role:'Pilih role',jalur:'Jalur saya',modul:'Katalog modul'};
   const parts=[];const hh=(location.hash||'').slice(1);
   if(h.startsWith('modul-')){const m=MOD[h.slice(6)];parts.push(['modul','Katalog modul'],[null,m?`${m.code} · ${shortT(m)}`:'Modul']);}
   else if(hh.startsWith('role-')){const r=ROLES.find(x=>x.id===hh.slice(5));parts.push(['role','Pilih role'],[null,r?r.t:'']);}
@@ -3212,46 +3630,49 @@ function renderCrumb(h){const el=$('#crumb');if(!el)return;const L={simulator:'S
   el.innerHTML=`<a href="#beranda">Akademi SAP</a>`+parts.map(([k,t])=>`<span class="sep">›</span>${k?`<a href="#${k}">${esc(t)}</a>`:`<span class="cur">${esc(t)}</span>`}`).join('');}
 
 /* ===================== SHARED PIECES ===================== */
-function mchips(M){return `<div class="mchips"><span class="pill ${M.les>=M.L?'ok':M.les?'ac':''}">Materi ${M.les}/${M.L}</span><span class="pill ${M.qok?'ok':M.q?'warn':''}">Kuis ${M.q?M.q+'%':'–'}</span>${M.hasSim?`<span class="pill ${M.prac?'ok':''}">Praktik ${M.prac?'✓':'–'}</span>`:''}</div>`;}
+function mchips(M){return `<div class="mchips"><span class="pill ${M.les>=M.L?'ok':M.les?'ac':''}">Bab ${M.les}/${M.L}</span><span class="pill ${M.simB>=M.L?'ok':M.simB?'ac':''}">Simulator ${M.simB}/${M.L}</span><span class="pill ${M.caseB>=M.L?'ok':M.caseB?'ac':''}">Kasus ${M.caseB}/${M.L}</span><span class="pill ${M.qok?'ok':M.q?'warn':''}">Ujian ${M.q?M.q+'%':'–'}</span></div>`;}
 function relRow(id){const m=MOD[id],M=mastery(m);return `<a class="relrow" href="#modul-${id}"><span class="c">${m.code}</span><b>${esc(shortT(m))}</b><span class="st ${M.done?'ok':''}">${M.done?'✓ Dikuasai':(M.les||M.q)?M.pct+'%':m.dur}</span></a>`;}
-function relCols(r){return `<div class="relcols">${['w','g','p'].map(k=>{const ids=r[k];const d=ids.filter(id=>mastery(MOD[id]).done).length;return `<div class="relcol"><h3>${relPill(k)} <span style="font-size:13px;color:var(--meta);font-weight:400">${d}/${ids.length} dikuasai</span></h3><p>${REL[k][2]}</p>${ids.map(relRow).join('')}</div>`;}).join('')}</div>`;}
-function roleCard(r){return `<a class="rolecard ${S.role===r.id?'on':''}" href="#role-${r.id}"><span class="row" style="justify-content:space-between"><b>${esc(r.t)}</b>${S.role===r.id?'<span class="pill ok">Jalurmu</span>':''}</span><small>${esc(r.d)}</small><span class="cnt"><span class="pill rel-w">${r.w.length} wajib</span><span class="pill rel-g">${r.g.length} general</span><span class="pill rel-p">${r.p.length} pendukung</span></span></a>`;}
-function modCard(m){const M=mastery(m),k=relOf(m.id);return `<a class="card modcard" href="#modul-${m.id}"><div class="top"><span class="code">${m.code} · ${m.dur}</span><span class="row" style="gap:4px">${relPill(k)}${M.done?'<span class="pill ok">Dikuasai</span>':''}</span></div><h3>${esc(shortT(m))}</h3><p>${m.sum}</p>${mchips(M)}<div class="bar"><i style="width:${M.pct}%"></i></div><div class="tcs">${m.tcs.slice(0,5).map(c=>/\s/.test(c)?'':tc(c)).join('')}</div></a>`;}
+function relCols(r){return `<div class="relcols">${['w','g','p'].map(k=>{const ids=r[k];const d=ids.filter(id=>mastery(MOD[id]).done).length;return `<div class="relcol"><h3>${REL[k][0]} <span style="font-size:13px;color:var(--meta);font-weight:400">${d}/${ids.length}</span></h3><p>${REL[k][2]}</p>${ids.map(relRow).join('')}</div>`;}).join('')}</div>`;}
+function roleCard(r){return `<a class="rolecard ${S.role===r.id?'on':''}" href="#role-${r.id}"><span class="row" style="justify-content:space-between"><b>${esc(r.t)}</b>${S.role===r.id?'<span class="pill ok">Jalurmu</span>':''}</span><small>${esc(r.d)}</small><span class="cnt"><span class="pill rel-w">${r.w.length} inti</span><span class="pill rel-g">${r.g.length} general</span><span class="pill rel-p">${r.p.length} pendukung</span></span></a>`;}
+function modCard(m){const M=mastery(m),k=relOrAdd(m.id);return `<a class="card modcard" href="#modul-${m.id}"><div class="top"><span class="code">${m.code} · ${m.dur}</span><span class="row" style="gap:4px">${relPill(k)}${M.done?'<span class="pill ok">Dikuasai</span>':''}</span></div><h3>${esc(shortT(m))}</h3><p>${m.sum}</p>${mchips(M)}<div class="bar"><i style="width:${M.pct}%"></i></div><div class="tcs">${m.tcs.slice(0,5).map(c=>/\s/.test(c)?'':tc(c)).join('')}</div></a>`;}
+function caseCard(c){const s=S.cases[c.id];return `<button class="scen" data-case="${c.id}"><span class="row"><span class="pill">${c.kind==='bab'?'Studi kasus bab':c.kind==='role'&&c.role?'Studi kasus role':c.mod?MOD[c.mod].code:'Role'}</span>${s!=null?`<span class="pill ok">Skor ${s}/${c.steps.length}</span>`:''}</span><b>${esc(c.title)}</b><small>${c.steps.length} keputusan</small></button>`;}
+function appCard(id){const a=APPPRAC[id],st=simStars(id);return `<button class="scen" data-app="${id}"><span class="row"><span class="pill">Latihan alur & aplikasi</span>${st?`<span class="pill ok">${'★'.repeat(st)}${'☆'.repeat(3-st)}</span>`:''}</span><b>${esc(a.title)}</b><small>${a.rows.length} aplikasi${a.flow?' · '+a.flow.length+' langkah alur':''}</small></button>`;}
+function bindCases(root){$$('[data-case]',root||document).forEach(b=>b.onclick=()=>playCase(b.dataset.case));}
+function bindAll(root){bindSimCards();bindCases(root);}
 
 /* ===================== HOME ===================== */
 function renderHome(){
   const r=roleOf(), p=progress();
-  const howto=`<h2>Cara belajar di platform ini</h2><div class="path"><span><b>1 · PILIH ROLE</b>Tentukan arah karir agar modul tersaring</span><span><b>2 · PELAJARI</b>Pelajaran pendek dengan cek pemahaman</span><span><b>3 · KUIS</b>Lulus kuis modul minimal 80%</span><span><b>4 · PRAKTIK</b>Skenario di simulator SAP GUI (jika ada)</span></div>`;
+  const howto=`<h2>Cara belajar di platform ini</h2><div class="path"><span><b>1 · PILIH ROLE</b>Kompetensi inti & general tersaring otomatis</span><span><b>2 · TIAP BAB</b>Materi → cek pemahaman → simulator bab → studi kasus bab</span><span><b>3 · UJIAN AKHIR MODUL</b>Lulus ≥ 80% untuk menguasai modul</span><span><b>4 · ROLE</b>Simulator, studi kasus, glosarium, flashcard, ujian akhir role</span></div>`;
   const note=`<div class="callout warn" style="margin-top:24px"><b>Tentang data di platform ini</b>Semua nomor dokumen, material, vendor, dan customer adalah contoh fiktif. Simulator meniru alur dan susunan layar SAP GUI; T-code yang dipakai adalah T-code standar. Cocokkan akses, T-code, dan kode organisasi dengan tim IT/key user sebelum bekerja di sistem asli.</div>`;
   if(!r){
     $('#view').innerHTML=`<div class="hero"><div><div class="eyebrow">Platform belajar SAP · semua role</div><h1>Belajar SAP sesuai arah karirmu</h1>
-      <p class="lead">${MODULES.length} modul dari Finance, Logistik, HR, Teknis, sampai solusi cloud. Pilih role, lalu kami tunjukkan modul yang <b>wajib</b>, yang dipakai <b>general</b>, dan yang sekadar <b>pendukung</b>, supaya kamu tidak kewalahan.</p>
+      <p class="lead">${MODULES.length} modul dari Finance, Logistik, HR, Teknis, sampai solusi cloud. Pilih role, lalu platform menyusun <b>kompetensi inti</b> dan <b>kompetensi general</b> yang perlu kamu kuasai, supaya kamu tidak kewalahan.</p>
       <div class="row" style="margin-top:20px"><a class="btn pri" href="#role">Pilih arah karir</a><a class="btn ghost" href="#modul">Jelajahi per modul</a></div></div>
       <div class="card"><div class="spread"><b style="font-size:18px">Isi platform</b></div><div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-        <div class="stat"><b>${MODULES.length}</b><span>modul SAP</span></div><div class="stat"><b>${ROLES.length}</b><span>role / arah karir</span></div>
-        <div class="stat"><b>${SIMS.filter(s=>!s.kase).length}</b><span>skenario simulator</span></div><div class="stat"><b>${CASES.length+SIMS.filter(s=>s.kase).length}</b><span>studi kasus</span></div></div></div></div>
-    <h2>Pilih arah karirmu</h2><p class="muted" style="max-width:72ch">Klik role untuk melihat modul wajib, general, dan pendukungnya sebelum memilih. Kamu bisa ganti role kapan saja; progres modul tetap tersimpan.</p>
+        <div class="stat"><b>${MODULES.length}</b><span>modul SAP</span></div><div class="stat"><b>${MODULES.reduce((a,m)=>a+m.lessons.length,0)}</b><span>bab, masing-masing dengan simulator & studi kasus</span></div>
+        <div class="stat"><b>${ROLES.length}</b><span>role / arah karir</span></div><div class="stat"><b>${GLOSS.length}</b><span>entri glosarium</span></div></div></div></div>
+    <h2>Pilih arah karirmu</h2><p class="muted" style="max-width:72ch">Klik role untuk melihat kompetensi inti, general, dan pendukungnya sebelum memilih. Kamu bisa ganti role kapan saja; progres modul tetap tersimpan.</p>
     ${RGRP.map(([g,t])=>`<h3 style="margin:20px 0 0;font-size:17px;font-weight:500">${t}</h3><div class="rolegrid">${ROLES.filter(x=>x.grp===g).map(roleCard).join('')}</div>`).join('')}
     ${howto}${note}`;return;}
-  const path=rolePath(r), core=roleCore(r), next=nextIn(core)||nextIn(path);
+  const core=roleCore(r), next=nextIn(core)||nextIn(rolePath(r));
   const cnt=k=>`${r[k].filter(id=>mastery(MOD[id]).done).length}/${r[k].length}`;
-  $('#view').innerHTML=`<div class="hero"><div><div class="eyebrow">Jalur belajar · ${esc(r.t)}</div><h1>${p.done>=p.core?'Jalur intimu selesai':'Lanjutkan jalurmu'}</h1>
-    <p class="lead">${next?`Berikutnya: <b>${next.code} · ${esc(shortT(next))}</b>. ${next.sum}`:'Semua modul di jalurmu sudah dikuasai. Kamu bebas mempelajari modul lain di katalog.'}</p>
-    <div class="row" style="margin-top:20px">${next?`<a class="btn pri" href="#modul-${next.id}">${mastery(next).les?'Lanjutkan':'Mulai'}: ${next.code}</a>`:`<a class="btn pri" href="#modul">Buka katalog modul</a>`}<a class="btn ghost" href="#jalur">Lihat jalur lengkap</a></div></div>
-    <div class="card"><div class="spread"><b style="font-size:18px">Progres jalur</b><span class="pill ${p.pct>=80?'ok':p.pct>=30?'warn':''}">${p.pct}%</span></div><div class="bar" style="height:10px;margin:10px 0 14px"><i style="width:${p.pct}%"></i></div>
-      <div class="relmini"><div>${relPill('w')}<span>${cnt('w')} modul</span></div><div>${relPill('g')}<span>${cnt('g')} modul</span></div><div>${relPill('p')}<span>${cnt('p')} modul</span></div><div><span>Ujian jalur terbaik</span><b style="color:var(--ink)">${p.q}%</b></div></div></div></div>
-  <h2>Modul untuk ${esc(r.t)}</h2><p class="muted" style="max-width:72ch">${esc(r.d)} Mulai dari dasar (general), lalu wajib, kemudian pendukung. <a href="#role-${r.id}">Lihat detail role</a> · <a href="#role">ganti role</a></p>
+  $('#view').innerHTML=`<div class="hero"><div><div class="eyebrow">Jalur belajar · ${esc(r.t)}</div><h1>${p.done>=p.core?'Kompetensimu lengkap':'Lanjutkan jalurmu'}</h1>
+    <p class="lead">${next?`Berikutnya: <b>${next.code} · ${esc(shortT(next))}</b>. ${next.sum}`:'Semua modul kompetensi sudah dikuasai. Ikuti ujian akhir role atau tambahkan modul add-on.'}</p>
+    <div class="row" style="margin-top:20px">${next?`<a class="btn pri" href="#modul-${next.id}">${mastery(next).les?'Lanjutkan':'Mulai'}: ${next.code}</a>`:`<a class="btn pri" href="#jalur">Buka ujian role</a>`}<a class="btn ghost" href="#jalur">Buka jalur saya</a></div></div>
+    <div class="card"><div class="spread"><b style="font-size:18px">Progres kompetensi</b><span class="pill ${p.pct>=80?'ok':p.pct>=30?'warn':''}">${p.pct}%</span></div><div class="bar" style="height:10px;margin:10px 0 14px"><i style="width:${p.pct}%"></i></div>
+      <div class="relmini"><div>${relPill('w')}<span>${cnt('w')} modul</span></div><div>${relPill('g')}<span>${cnt('g')} modul</span></div><div>${relPill('p')}<span>${cnt('p')} modul</span></div><div><span>Ujian akhir role terbaik</span><b style="color:var(--ink)">${p.q}%</b></div></div></div></div>
+  <h2>Kompetensi untuk ${esc(r.t)}</h2><p class="muted" style="max-width:72ch">${esc(r.d)} <a href="#role-${r.id}">Detail role</a> · <a href="#role">ganti role</a></p>
   ${relCols(r)}
   ${howto}
-  <h2>Di luar jalurmu</h2><p class="muted" style="max-width:72ch">Masih ada ${MODULES.length-path.length} modul lain. Semua bisa dibuka kapan saja, tapi kami sarankan setelah modul wajib dan general selesai.</p>
+  <h2>Di luar jalurmu</h2><p class="muted" style="max-width:72ch">Modul lain bisa ditambahkan sebagai <b>add-on</b>. Kamu tetap mendapat materi, simulator dan studi kasus per bab, serta ujian akhir modulnya.</p>
   <div class="row"><a class="btn ghost" href="#modul">Buka katalog semua modul</a></div>${note}`;
 }
-function nextIn(ids){return ids.map(id=>MOD[id]).find(m=>!mastery(m).done);}
 
 /* ===================== ROLES ===================== */
 function renderRoles(){
   const r=roleOf();
-  $('#view').innerHTML=`<div class="eyebrow">Arah karir</div><h1>${r?'Ganti role':'Pilih role'}</h1><p class="lead">Setiap role punya modul <b>wajib</b> (inti pekerjaan), <b>general</b> (dipakai umum sehari-hari, termasuk dasar SAP), dan <b>pendukung</b> (proses tetangga). Klik role untuk melihat detailnya.</p>
+  $('#view').innerHTML=`<div class="eyebrow">Arah karir</div><h1>${r?'Ganti role':'Pilih role'}</h1><p class="lead">Setiap role punya <b>kompetensi inti</b> (inti pekerjaan), <b>kompetensi general</b> (dipakai umum sehari-hari, termasuk dasar SAP), dan modul <b>pendukung</b>. Klik role untuk melihat detailnya.</p>
   ${r?`<div class="outpath" style="margin-top:14px">Jalurmu sekarang: <b>${esc(r.t)}</b>. Progres modul tetap tersimpan jika kamu berganti role. <button class="btn sm ghost" id="noRole">Belajar tanpa role</button></div>`:''}
   ${RGRP.map(([g,t])=>`<h2>${t}</h2><div class="rolegrid">${ROLES.filter(x=>x.grp===g).map(roleCard).join('')}</div>`).join('')}
   <p class="muted" style="margin-top:22px">Role kamu tidak ada? Pilih yang paling dekat, atau <a href="#modul">jelajahi katalog per modul</a>.</p>`;
@@ -3259,26 +3680,45 @@ function renderRoles(){
 }
 function renderRoleDetail(id){
   const r=ROLES.find(x=>x.id===id), mine=S.role===id, core=roleCore(r);
-  const sims=SIMS.filter(s=>!s.kase&&relOf(s.mod,r)).length, cases=CASES.filter(c=>relOf(c.mod,r)).length+SIMS.filter(s=>s.kase&&relOf(s.mod,r)).length;
   $('#view').innerHTML=`<header class="pagehero"><div class="eyebrow">Arah karir · ${RGRP.find(g=>g[0]===r.grp)[1]}</div>
    <div class="spread" style="align-items:flex-end"><h1>${esc(r.t)}</h1>${mine?'<span class="pill ok">Jalur aktifmu</span>':''}</div><p class="lead">${esc(r.d)}</p>
    <div class="row" style="margin-top:14px">${mine?`<a class="btn pri" href="#jalur">Buka jalurku</a>`:`<button class="btn pri" id="pickRole">Jadikan jalur saya</button>`}<a class="btn ghost" href="#role">← Semua role</a></div></header>
-  <div class="grid g3" style="margin-top:18px"><div class="stat"><b>${core.length} modul</b><span>wajib + general (± ${Math.round(durMin(core)/60*10)/10} jam)</span></div><div class="stat"><b>${r.p.length} modul</b><span>pendukung, opsional</span></div><div class="stat"><b>${sims} skenario · ${cases} kasus</b><span>praktik yang relevan</span></div></div>
+  <div class="grid g3" style="margin-top:18px"><div class="stat"><b>${core.length} modul</b><span>kompetensi inti + general (± ${Math.round(durMin(core)/60*10)/10} jam materi)</span></div><div class="stat"><b>${roleSims(r).length} simulator · ${roleCases(r).length} kasus</b><span>praktik khusus role</span></div><div class="stat"><b>${GLOSS.filter(g=>g.mods.some(x=>rolePath(r).includes(x))).length} entri</b><span>glosarium & flashcard role</span></div></div>
   <h2>Tugas yang biasa dikerjakan</h2><ul>${r.tasks.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
-  <h2>Modul yang perlu kamu pelajari</h2>${relCols(r)}
-  <p class="muted" style="margin-top:14px">Modul lain tetap bisa dibuka dari katalog, tapi tidak dihitung dalam progres jalur ini.</p>`;
-  $('#pickRole')&&($('#pickRole').onclick=()=>{S.role=id;save();location.hash='jalur';});
+  <h2>Kompetensi yang perlu kamu kuasai</h2>${relCols(r)}`;
+  $('#pickRole')&&($('#pickRole').onclick=()=>{S.role=id;JV='komp';save();location.hash='jalur';});
 }
+
+/* ===================== JALUR SAYA (hub role) ===================== */
 function renderPath(){
-  const r=roleOf(), p=progress(), path=rolePath(r), core=roleCore(r), next=nextIn(core)||nextIn(path);
+  const r=roleOf(), p=progress(), core=roleCore(r), next=nextIn(core)||nextIn(rolePath(r));
+  const tabs=[['komp','Kompetensi'],['sim','Simulator role'],['kasus','Studi kasus role'],['glos','Glosarium'],['fc','Flashcard'],['ujian','Ujian akhir role']];
+  const ex=attOf('rx:'+r.id);
   $('#view').innerHTML=`<header class="pagehero"><div class="eyebrow">Jalur saya</div><div class="spread" style="align-items:flex-end"><h1>${esc(r.t)}</h1><span class="pill">${p.pct}%</span></div>
-   <p class="lead">${p.done}/${p.core} modul inti (wajib + general) dikuasai. Pendukung bersifat opsional dan bisa dipelajari setelahnya.</p>
+   <p class="lead">${p.done}/${p.core} modul kompetensi (inti + general) dikuasai · ujian akhir role: pertama ${sc(ex.first)}, tertinggi ${sc(ex.best)}.</p>
    <div class="row" style="margin-top:14px">${next?`<a class="btn pri" href="#modul-${next.id}">${mastery(next).les?'Lanjutkan':'Mulai'}: ${next.code}</a>`:''}<a class="btn ghost" href="#role">Ganti role</a></div></header>
-  ${p.done>=p.core?`<div class="callout" style="margin-top:18px"><b>Jalur inti selesai</b>Kamu sudah menguasai semua modul wajib dan general. Lanjutkan ke modul pendukung, ikuti ujian jalur di <a href="#kuis">Kuis & Ujian</a>, atau buka <a href="#modul">katalog</a> untuk modul lain.</div>`:''}
-  <h2>Urutan belajar yang disarankan</h2>
-  <div class="pathlist">${path.map((id,i)=>{const m=MOD[id],M=mastery(m),k=relOf(id,r);return `<a href="#modul-${id}" class="${next&&next.id===id?'next':''}"><span class="n ${M.done?'ok':''}">${M.done?'✓':i+1}</span><span class="c">${m.code}</span><span class="t"><b>${esc(shortT(m))}</b><small>${m.dur} · ${M.done?'Dikuasai':`Materi ${M.les}/${M.L} · Kuis ${M.q?M.q+'%':'–'}${M.hasSim?` · Praktik ${M.prac?'✓':'–'}`:''}`}</small></span><span class="r">${relPill(k)}</span></a>`;}).join('')}</div>
-  <h2>Praktik untuk jalur ini</h2><div class="scen-list">${SIMS.filter(s=>relOf(s.mod,r)).map(simCard).join('')||'<p class="muted">Modul di jalur ini belum punya skenario simulator. Fokus pada materi, kuis, dan flashcard.</p>'}</div>`;
-  bindSimCards();
+  <div class="chips" id="jvTabs" style="margin-top:18px">${tabs.map(([k,t])=>`<button class="chip ${JV===k?'on':''}" data-jv="${k}">${t}</button>`).join('')}</div><div id="jvBody"></div>`;
+  $$('#jvTabs .chip').forEach(b=>b.onclick=()=>{JV=b.dataset.jv;$$('#jvTabs .chip').forEach(x=>x.classList.toggle('on',x===b));drawJV();});
+  drawJV();
+}
+function pathRows(ids,k,start){const next=nextIn(roleCore(roleOf()));return `<div class="pathlist">${ids.map((id,i)=>{const m=MOD[id],M=mastery(m);return `<a href="#modul-${id}" class="${next&&next.id===id?'next':''}"><span class="n ${M.done?'ok':''}">${M.done?'✓':start+i}</span><span class="c">${m.code}</span><span class="t"><b>${esc(shortT(m))}</b><small>${m.dur} · Bab ${M.les}/${M.L} · Simulator ${M.simB}/${M.L} · Kasus ${M.caseB}/${M.L} · Ujian ${M.q?M.q+'%':'–'}</small></span><span class="r">${relPill(k)}</span></a>`;}).join('')}</div>`;}
+function drawJV(){
+  const r=roleOf(), el=$('#jvBody'); const f=r.g.filter(x=>x==='nav'||x==='org'), g=r.g.filter(x=>!f.includes(x)), adds=S.addons.filter(id=>!relOf(id,r));
+  if(JV==='komp'){let n=1;const part=(t,d,ids,k)=>{if(!ids.length)return '';const h=`<h2>${t}</h2><p class="muted" style="max-width:72ch">${d}</p>${pathRows(ids,k,n)}`;n+=ids.length;return h;};
+    el.innerHTML=part('1 · Dasar SAP','Fondasi navigasi dan data induk, bagian dari kompetensi general.',f,'g')+part('2 · Kompetensi inti',REL.w[2],r.w,'w')+part('3 · Kompetensi general',REL.g[2],g,'g')+part('4 · Pendukung (opsional)',REL.p[2],r.p,'p')+
+      (adds.length?part('Add-on pilihanmu',REL.a[2],adds,'a'):`<p class="muted" style="margin-top:18px">Ingin belajar modul lain? Buka <a href="#modul">katalog</a> dan klik "Tambah sebagai add-on" di halaman modulnya.</p>`);}
+  else if(JV==='sim'){el.innerHTML=`<p class="muted" style="max-width:72ch;margin-top:14px">Simulator role menggabungkan beberapa transaksi lintas modul seperti satu hari kerja ${esc(r.t)}, berbeda dengan simulator per bab di dalam modul.</p><div class="scen-list">${roleSims(r).map(id=>simCard(SIMS.find(x=>x.id===id))).join('')}</div>`;bindAll(el);}
+  else if(JV==='kasus'){el.innerHTML=`<p class="muted" style="max-width:72ch;margin-top:14px">Studi kasus lintas modul untuk situasi nyata role ini. Studi kasus per bab ada di halaman masing-masing modul.</p><div class="scen-list">${roleCases(r).map(caseCard).join('')}</div>`;bindAll(el);}
+  else if(JV==='glos') renderGloss(el,{embed:true,scope:'jalur'});
+  else if(JV==='fc') renderCards(el,{embed:true});
+  else if(JV==='ujian') drawRoleExam(el);
+}
+function drawRoleExam(el){
+  const r=roleOf(), ex=attOf('rx:'+r.id), pool=roleExamPool(r);
+  el.innerHTML=`<div class="card" style="margin-top:14px"><b style="font-size:18px">Ujian akhir role ${esc(r.t)}</b><p>20 soal acak dari ${roleCore(r).length} modul kompetensi inti dan general (${pool.length} soal di bank). Lulus ≥ 80%.</p>
+   <div class="grid g3"><div class="stat"><b>${sc(ex.first)}</b><span>nilai percobaan pertama</span></div><div class="stat"><b>${sc(ex.best)}</b><span>nilai tertinggi</span></div><div class="stat"><b>${ex.n}×</b><span>percobaan · terakhir ${fmtD(ex.last&&ex.last.t)}</span></div></div>
+   <div class="row" style="margin-top:12px"><button class="btn" id="rxGo">${ex.n?'Ulangi ujian':'Mulai ujian'}</button></div></div><div id="rxArea"></div>`;
+  $('#rxGo').onclick=()=>{const qs=shuffle(pool).slice(0,20).map(q=>Object.assign(shufQ(q),{mod:q.mod}));runMC($('#rxArea'),qs,s=>{S.quiz.r=S.quiz.r||{};S.quiz.r[r.id]=Math.max(S.quiz.r[r.id]||0,s);logAtt('rx:'+r.id,s);renderNav('jalur');},true);$('#rxArea').scrollIntoView({behavior:'smooth'});};
 }
 
 /* ===================== CATALOG ===================== */
@@ -3287,12 +3727,13 @@ function renderCatalog(){
   const r=roleOf(); if(!CATV||(!r&&CATV.f==='jalur'))CATV={f:r?'jalur':'all',q:''};
   const draw=()=>{const q=CATV.q.toLowerCase();const hit=m=>!q||(m.code+' '+m.title+' '+m.sum+' '+m.tcs.join(' ')).toLowerCase().includes(q);
     let body='';
-    if(CATV.f==='jalur'&&r){body=['w','g','p'].map(k=>{const ms=r[k].map(id=>MOD[id]).filter(hit);return ms.length?`<section class="catsec"><h2 style="display:flex;gap:10px;align-items:center">${relPill(k)} ${REL[k][0]}</h2><p>${REL[k][2]}</p><div class="grid g3">${ms.map(modCard).join('')}</div></section>`:'';}).join('');}
+    if(CATV.f==='jalur'&&r){body=['w','g','p'].map(k=>{const ms=r[k].map(id=>MOD[id]).filter(hit);return ms.length?`<section class="catsec"><h2>${REL[k][0]}</h2><p>${REL[k][2]}</p><div class="grid g3">${ms.map(modCard).join('')}</div></section>`:'';}).join('');
+      const ad=S.addons.filter(id=>!relOf(id,r)).map(id=>MOD[id]).filter(hit);if(ad.length)body+=`<section class="catsec"><h2>Add-on</h2><p>${REL.a[2]}</p><div class="grid g3">${ad.map(modCard).join('')}</div></section>`;}
     else body=CATS.map(c=>{const ms=MODULES.filter(m=>m.cat===c.id&&hit(m));return ms.length?`<section class="catsec"><h2>${c.t} <span style="font-size:15px;color:var(--meta);font-weight:400">${ms.length} modul</span></h2><p>${c.d}</p><div class="grid g3">${ms.map(modCard).join('')}</div></section>`:'';}).join('');
     $('#catBody').innerHTML=body||'<p class="muted" style="margin-top:18px">Tidak ada modul yang cocok.</p>';};
-  $('#view').innerHTML=`<div class="eyebrow">Katalog</div><h1>Katalog modul SAP</h1><p class="lead">${MODULES.length} modul dalam ${CATS.length} kelompok. Setiap modul berisi 3–5 pelajaran bertahap dengan cek pemahaman, poin kunci, T-code/app penting, alur proses, integrasi, dan kuis 5 soal.</p>
-  ${r?'':`<div class="outpath" style="margin-top:14px">Belum memilih role. <a href="#role">Pilih arah karir</a> agar katalog menandai modul wajib, general, dan pendukung untukmu.</div>`}
-  <div class="chips" id="catF">${r?`<button class="chip ${CATV.f==='jalur'?'on':''}" data-f="jalur">Jalur ${esc(r.t)} (${rolePath(r).length})</button>`:''}<button class="chip ${CATV.f==='all'?'on':''}" data-f="all">Semua modul (${MODULES.length})</button></div>
+  $('#view').innerHTML=`<div class="eyebrow">Katalog</div><h1>Katalog modul SAP</h1><p class="lead">${MODULES.length} modul dalam ${CATS.length} kelompok. Setiap bab berisi materi, cek pemahaman, simulator bab, dan studi kasus bab. Setiap modul ditutup dengan ujian akhir.</p>
+  ${r?'':`<div class="outpath" style="margin-top:14px">Belum memilih role. <a href="#role">Pilih arah karir</a> agar katalog menandai kompetensi inti, general, dan pendukung untukmu.</div>`}
+  <div class="chips" id="catF">${r?`<button class="chip ${CATV.f==='jalur'?'on':''}" data-f="jalur">Jalur ${esc(r.t)}</button>`:''}<button class="chip ${CATV.f==='all'?'on':''}" data-f="all">Semua modul (${MODULES.length})</button></div>
   <div class="filt"><input id="catQ" placeholder="Cari modul atau T-code, misal MIGO, FB60, payroll" value="${esc(CATV.q)}" aria-label="Cari modul" style="min-width:300px"></div>
   <div id="catBody"></div>`;
   $$('#catF .chip').forEach(b=>b.onclick=()=>{CATV.f=b.dataset.f;$$('#catF .chip').forEach(x=>x.classList.toggle('on',x===b));draw();});
@@ -3300,79 +3741,220 @@ function renderCatalog(){
   draw();
 }
 
-/* ===================== MODULE (lesson stepper) ===================== */
+/* ===================== MODULE: bab → materi, simulator bab, studi kasus bab → ujian akhir ===================== */
 function renderModule(id){
   const m=MOD[id];
-  if(!MODV||MODV.id!==m.id){const M=mastery(m);MODV={id:m.id,view:M.les>=M.L?'quiz':'l'+Math.min(M.les,M.L-1)};}
+  if(!MODV||MODV.id!==m.id){const M=mastery(m);MODV={id:m.id,view:M.les>=M.L?'exam':'l'+Math.min(M.les,M.L-1)};}
   drawModule(m);
 }
 function modSeq(m){const r=roleOf();return r&&relOf(m.id,r)?rolePath(r):ORDER;}
 function drawModule(m){
-  const M=mastery(m); const v=MODV.view; const r=roleOf(), k=relOf(m.id,r);
+  const M=mastery(m); const v=MODV.view; const r=roleOf(), k=relOrAdd(m.id);
   const seq=modSeq(m), ix=seq.indexOf(m.id); const prev=MOD[seq[ix-1]], next=MOD[seq[ix+1]];
-  const lockQ=M.les<M.L;
-  const toc=m.lessons.map((l,i)=>{const st=i<M.les?'ok':i===M.les?'cur':'lock';return `<button data-lv="l${i}" class="${v==='l'+i?'on':''}" ${i>M.les?'disabled':''}><span class="st ${st}">${st==='ok'?'✓':''}</span><span>${i+1}. ${esc(l.t)}</span></button>`;}).join('')+
-   `<div class="lt-h">Uji & praktik</div><button data-lv="quiz" class="${v==='quiz'?'on':''}" ${lockQ?'disabled':''}><span class="st ${M.qok?'ok':lockQ?'lock':'cur'}">${M.qok?'✓':''}</span><span>Kuis modul${M.q?` (${M.q}%)`:''}</span></button>`+
-   (M.hasSim?`<button data-lv="prak" class="${v==='prak'?'on':''}"><span class="st ${M.prac?'ok':'cur'}">${M.prac?'✓':''}</span><span>Praktik simulator</span></button>`:'')+
+  const lockX=M.les<M.L;
+  const toc=m.lessons.map((l,i)=>{const st=i<M.les?'ok':i===M.les?'cur':'lock';const B=babState(m.id,i);const pd=(B.sim?1:0)+(B.kasus?1:0);
+    return `<button data-lv="l${i}" class="${v==='l'+i?'on':''}" ${i>M.les?'disabled':''}><span class="st ${st}">${st==='ok'?'✓':''}</span><span>Bab ${i+1}. ${esc(l.t)}</span></button>
+    <button data-lv="p${i}" class="sub ${v==='p'+i?'on':''}" ${i>=M.les?'disabled':''}><span class="st ${pd===2?'ok':i<M.les?'cur':'lock'}">${pd===2?'✓':''}</span><span>Simulator & studi kasus bab ${i+1} <small>(${pd}/2)</small></span></button>`;}).join('')+
+   `<div class="lt-h">Penutup modul</div><button data-lv="exam" class="${v==='exam'?'on':''}" ${lockX?'disabled':''}><span class="st ${M.qok?'ok':lockX?'lock':'cur'}">${M.qok?'✓':''}</span><span>Ujian akhir modul${M.q?` (${M.q}%)`:''}</span></button>`+
    `<button data-lv="note" class="${v==='note'?'on':''}"><span class="st ${S.notes[m.id]?'ok':''}">${S.notes[m.id]?'✓':''}</span><span>Catatan saya</span></button>`;
   let body='';
-  if(v.startsWith('l')){
+  if(v[0]==='l'){
     const i=+v.slice(1), l=m.lessons[i];
-    body=`<div class="lesson-h"><h2>${i+1}. ${esc(l.t)}</h2><span class="pill">Pelajaran ${i+1} dari ${M.L}</span></div>
+    body=`<div class="lesson-h"><h2>Bab ${i+1}. ${esc(l.t)}</h2><span class="pill">Bab ${i+1} dari ${M.L}</span></div>
     ${i===0?`<div class="objs">${m.objs.map(o=>`<div>${esc(o)}</div>`).join('')}</div>`:''}
     <div class="prose">${l.html}</div>
     <div class="keypts"><b>Poin kunci</b><ul>${l.keys.map(k=>`<li>${esc(k)}</li>`).join('')}</ul></div>
     <div class="cp" id="cpBox"></div>`;
-  } else if(v==='quiz'){
-    body=`<div class="lesson-h"><h2>Kuis ${m.code}</h2><span class="pill ${M.qok?'ok':''}">Lulus ≥ 80% · terbaik ${M.q||0}%</span></div><p class="muted">${m.quiz.length} soal. Opsi jawaban diacak setiap kali kamu mengulang.</p><div id="mq"></div>`;
-  } else if(v==='prak'){
-    body=`<div class="lesson-h"><h2>Praktik di simulator</h2><span class="pill ${M.prac?'ok':''}">${M.prac?'Selesai':'Selesaikan minimal satu'}</span></div><p>Kerjakan skenario berikut. Mulai dengan <b>Mode panduan</b>, lalu ulangi di <b>Mode ujian</b> untuk memastikan kamu bisa tanpa bantuan.</p><div class="scen-list">${M.sims.map(simCard).join('')}</div>`;
+  } else if(v[0]==='p'){
+    const i=+v.slice(1), B=BAB[m.id][i], st=babState(m.id,i);
+    body=`<div class="lesson-h"><h2>Praktik bab ${i+1}: ${esc(m.lessons[i].t)}</h2><span class="pill ${st.sim&&st.kasus?'ok':''}">${(st.sim?1:0)+(st.kasus?1:0)}/2 selesai</span></div>
+    <p class="muted">Latihan ini khusus untuk isi bab ${i+1}. Selesaikan keduanya sebelum lanjut ke bab berikutnya.</p>
+    <h3 class="ph">1 · Simulator bab ${st.sim?'<span class="pill ok">Selesai</span>':''}</h3><div class="scen-list">${B.sims.map(id=>simCard(SIMS.find(x=>x.id===id))).join('')}${B.app?appCard(B.app):''}</div>
+    <h3 class="ph">2 · Studi kasus bab ${st.kasus?'<span class="pill ok">Selesai</span>':''}</h3><div class="scen-list">${caseCard(B.case)}</div>
+    <div class="row" style="margin-top:18px">${i<M.L-1?`<button class="btn sm" data-lv="l${i+1}" ${i+1>M.les?'disabled':''}>Lanjut ke bab ${i+2} →</button>`:`<button class="btn sm" data-lv="exam" ${lockX?'disabled':''}>Buka ujian akhir modul →</button>`}</div>`;
+  } else if(v==='exam'){
+    const ex=M.ex, pool=modExamPool(m);
+    body=`<div class="lesson-h"><h2>Ujian akhir ${m.code}</h2><span class="pill ${M.qok?'ok':''}">Lulus ≥ 80%</span></div>
+    <p>Ujian mencakup semua bab: soal konsep, cek pemahaman tiap bab, dan T-code. ${pool.length} soal, urutan dan opsi diacak.</p>
+    <div class="grid g3"><div class="stat"><b>${sc(ex.first)}</b><span>nilai pertama</span></div><div class="stat"><b>${sc(ex.best!=null?ex.best:(M.q||null))}</b><span>nilai tertinggi</span></div><div class="stat"><b>${ex.n}×</b><span>percobaan · terakhir ${fmtD(ex.last&&ex.last.t)}</span></div></div>
+    <div class="row" style="margin:12px 0"><button class="btn" id="mxGo">${ex.n?'Ulangi ujian':'Mulai ujian'}</button></div><div id="mq"></div>`;
   } else if(v==='note'){
     body=`<div class="lesson-h"><h2>Catatan saya</h2><span class="pill">Tersimpan di browser ini</span></div><p>${esc(m.note)}</p><textarea class="note" id="noteTa" placeholder="Tulis di sini…">${esc(S.notes[m.id]||'')}</textarea><p class="muted" style="font-size:13px" id="noteSt"></p>`;
   }
-  const wl=rolesFor(m.id,'w');
+  const wl=rolesFor(m.id,'w'); const isAdd=S.addons.includes(m.id);
   let banner='';
-  if(r&&!k){const wd=r.w.filter(id=>mastery(MOD[id]).done).length;banner=`<div class="outpath">${wd>=r.w.length?`Modul ini di luar jalur <b>${esc(r.t)}</b>. Modul wajibmu sudah selesai, jadi silakan eksplor.`:`Modul ini di luar jalur <b>${esc(r.t)}</b>. Boleh dipelajari, tapi kami sarankan selesaikan modul wajib dulu (${wd}/${r.w.length}).`} <a href="#jalur">Lihat jalurku</a></div>`;}
+  if(r&&!relOf(m.id,r)){const wd=r.w.filter(id=>mastery(MOD[id]).done).length;banner=`<div class="outpath">${isAdd?`Modul ini add-on di jalur <b>${esc(r.t)}</b>.`:`Modul ini di luar jalur <b>${esc(r.t)}</b>. ${wd>=r.w.length?'Kompetensi intimu sudah selesai, silakan eksplor.':`Kami sarankan selesaikan kompetensi inti dulu (${wd}/${r.w.length}).`}`} <button class="btn sm ghost" id="addOn">${isAdd?'Hapus dari add-on':'Tambah sebagai add-on'}</button></div>`;}
+  else if(!r&&!isAdd){banner=`<div class="outpath">Belum memilih role. <button class="btn sm ghost" id="addOn">Tambah sebagai add-on</button> <a href="#role">Pilih role</a></div>`;}
   $('#view').innerHTML=`<header class="pagehero">
   <div class="eyebrow">${m.code} · ${catName(m.cat)} · ${m.dur}</div>
   <div class="spread" style="align-items:flex-end"><h1>${esc(m.title)}</h1><span class="row" style="gap:6px">${k?relPill(k):''}${M.done?'<span class="pill ok">Modul dikuasai</span>':''}</span></div>
   <p class="lead">${m.sum}</p>
-  <div class="row" style="margin-top:12px">${mchips(M)}<span class="muted" style="font-size:13px">${M.done?'Semua syarat terpenuhi.':'Syarat dikuasai: semua pelajaran, kuis ≥ 80%'+(M.hasSim?', satu skenario simulator':'')+'.'}</span></div>
-  ${wl.length?`<p style="margin:10px 0 0;font-size:13px">Wajib untuk: ${wl.map(x=>`<a href="#role-${x.id}" style="color:#fff">${esc(x.t)}</a>`).join(', ')}</p>`:''}</header>
+  <div class="row" style="margin-top:12px">${mchips(M)}<span class="muted" style="font-size:13px">${M.done?'Modul dikuasai.':'Syarat dikuasai: semua bab lulus cek pemahaman dan ujian akhir ≥ 80%.'}</span></div>
+  ${wl.length?`<p style="margin:10px 0 0;font-size:13px">Kompetensi inti untuk: ${wl.map(x=>`<a href="#role-${x.id}" style="color:#fff">${esc(x.t)}</a>`).join(', ')}</p>`:''}</header>
   ${banner}
-  <div class="mod-layout"><nav class="ltoc" aria-label="Daftar pelajaran"><div class="lt-h">Pelajaran</div>${toc}</nav><div class="lesson">${body}
-  <div class="foot-nav">${prev?`<a class="btn ghost" href="#modul-${prev.id}">← ${prev.code}</a>`:'<span></span>'}${next?`<a class="btn ghost" href="#modul-${next.id}">${next.code}: ${esc(shortT(next))} →</a>`:`<a class="btn ghost" href="#kuis">Ujian ${r?'jalur':'campuran'} →</a>`}</div></div></div>`;
+  <div class="mod-layout"><nav class="ltoc" aria-label="Daftar bab"><div class="lt-h">Bab</div>${toc}</nav><div class="lesson">${body}
+  <div class="foot-nav">${prev?`<a class="btn ghost" href="#modul-${prev.id}">← ${prev.code}</a>`:'<span></span>'}${next?`<a class="btn ghost" href="#modul-${next.id}">${next.code}: ${esc(shortT(next))} →</a>`:`<a class="btn ghost" href="#${r?'jalur':'kuis'}">${r?'Jalur saya':'Ujian'} →</a>`}</div></div></div>`;
   $$('[data-lv]').forEach(b=>b.onclick=()=>{MODV.view=b.dataset.lv;drawModule(m);window.scrollTo({top:0});});
+  $('#addOn')&&($('#addOn').onclick=()=>{S.addons=isAdd?S.addons.filter(x=>x!==m.id):[...S.addons,m.id];save();drawModule(m);renderNav('modul-'+m.id);});
   initWidgets($('#view'));
-  bindSimCards();
-  if(v.startsWith('l')) drawCheckpoint(m,+v.slice(1));
-  if(v==='quiz') runMC($('#mq'),m.quiz.map(q=>shufQ(q)),sc=>{S.mq[m.id]=Math.max(S.mq[m.id]||0,sc);save();renderNav('modul-'+m.id);const rs=$('#mcRes');if(rs&&sc>=80){rs.insertAdjacentHTML('beforeend',`<div style="margin-top:8px">${M.hasSim&&!M.prac?'<button class="btn sm" id="goPrak">Lanjut ke praktik simulator →</button>':next?`<a class="btn sm" href="#modul-${next.id}">Lanjut ke ${next.code} →</a>`:''}</div>`);$('#goPrak')&&($('#goPrak').onclick=()=>{MODV.view='prak';drawModule(m);});}});
+  bindAll($('#view'));
+  if(v[0]==='l') drawCheckpoint(m,+v.slice(1));
+  if(v==='exam'){$('#mxGo').onclick=()=>{const qs=shuffle(modExamPool(m)).map(q=>shufQ(q));runMC($('#mq'),qs,s=>{S.mq[m.id]=Math.max(S.mq[m.id]||0,s);logAtt('mx:'+m.id,s);renderNav('modul-'+m.id);const rs=$('#mcRes');if(rs&&s>=80&&next)rs.insertAdjacentHTML('beforeend',`<div style="margin-top:8px"><a class="btn sm" href="#modul-${next.id}">Lanjut ke ${next.code} →</a></div>`);},true);};}
   if(v==='note'){const ta=$('#noteTa');let t;ta.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.notes[m.id]=ta.value;save();$('#noteSt').textContent='Tersimpan.';},400);};}
 }
-function shufQ(q){const idx=shuffle(q.o.map((_,i)=>i));return {q:q.q,o:idx.map(i=>q.o[i]),a:idx.indexOf(q.a),e:q.e};}
 function drawCheckpoint(m,i){
-  const M=mastery(m); const passed=i<M.les; const box=$('#cpBox'); const c=m.lessons[i].cp;
+  const M=mastery(m); const passed=i<M.les; const box=$('#cpBox'); const c=m.lessons[i].cp; const key=m.id+':'+i;
   const q=box._q||(box._q=shufQ(c));
-  const isLast=i===m.lessons.length-1;
-  const nextBtn=isLast?`<button class="btn sm" id="cpNext">${M.qok?'Lihat kuis modul':'Buka kuis modul →'}</button>`:`<button class="btn sm" id="cpNext">Pelajaran berikutnya →</button>`;
+  const nextBtn=`<button class="btn sm" id="cpNext">Lanjut ke simulator & studi kasus bab ${i+1} →</button>`;
+  const goP=()=>{MODV.view='p'+i;drawModule(m);window.scrollTo({top:0});};
   if(passed&&!box._retry){box.innerHTML=`<div class="cp-h">Cek pemahaman ✓</div><p style="margin:0 0 10px">${esc(c.q)}</p><div class="exp"><b style="color:var(--ok)">Sudah lulus.</b> Jawaban: ${esc(c.o[c.a])}. ${esc(c.e)}</div><div class="row" style="margin-top:10px">${nextBtn}<button class="btn sm ghost" id="cpRetry">Coba jawab lagi</button></div>`;
-    $('#cpNext').onclick=()=>{MODV.view=isLast?'quiz':'l'+(i+1);drawModule(m);window.scrollTo({top:0});};
-    $('#cpRetry').onclick=()=>{box._retry=true;box._q=shufQ(c);drawCheckpoint(m,i);};return;}
-  box.innerHTML=`<div class="cp-h">Cek pemahaman</div><p style="margin:0 0 6px">${esc(q.q)}</p><p class="muted" style="font-size:13px;margin:0 0 6px">Jawab benar untuk membuka ${isLast?'kuis modul':'pelajaran berikutnya'}.</p>${q.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o)}</button>`).join('')}<div id="cpFb"></div>`;
+    $('#cpNext').onclick=goP;$('#cpRetry').onclick=()=>{box._retry=true;box._q=shufQ(c);drawCheckpoint(m,i);};return;}
+  box.innerHTML=`<div class="cp-h">Cek pemahaman</div><p style="margin:0 0 6px">${esc(q.q)}</p><p class="muted" style="font-size:13px;margin:0 0 6px">Jawab benar untuk membuka praktik bab ini dan bab berikutnya.</p>${q.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o)}</button>`).join('')}<div id="cpFb"></div>`;
   $$('.opt',box).forEach(b=>b.onclick=()=>{
     const j=+b.dataset.j, ok=j===q.a;
-    $$('.opt',box).forEach(x=>{x.disabled=true;});
-    b.classList.add(ok?'right':'wrong');
+    if(S.cpf[key]==null){S.cpf[key]=ok?1:0;save();}
+    $$('.opt',box).forEach(x=>{x.disabled=true;});b.classList.add(ok?'right':'wrong');
     if(ok){S.les[m.id]=Math.max(S.les[m.id]||0,i+1);save();renderNav('modul-'+m.id);
-      $('#cpFb').innerHTML=`<div class="exp"><b style="color:var(--ok)">Benar.</b> ${esc(q.e)}</div><div class="row" style="margin-top:10px">${nextBtn}</div>`;
-      $('#cpNext').onclick=()=>{MODV.view=isLast?'quiz':'l'+(i+1);drawModule(m);window.scrollTo({top:0});};
+      $('#cpFb').innerHTML=`<div class="exp"><b style="color:var(--ok)">Benar.</b> ${esc(q.e)}</div><div class="row" style="margin-top:10px">${nextBtn}</div>`;$('#cpNext').onclick=goP;
     } else {
       $('#cpFb').innerHTML=`<div class="exp"><b style="color:var(--bad)">Belum tepat.</b> Baca lagi bagian di atas, terutama poin kunci, lalu coba lagi. Urutan pilihan akan diacak.</div><button class="btn sm ghost" id="cpAgain" style="margin-top:10px">Coba lagi</button>`;
-      $('#cpAgain').onclick=()=>{box._q=shufQ(c);drawCheckpoint(m,i);};
-    }
+      $('#cpAgain').onclick=()=>{box._q=shufQ(c);drawCheckpoint(m,i);};}
   });
 }
 
+/* ===================== LATIHAN ALUR & APLIKASI (bab non-SAP GUI) ===================== */
+function playApp(id){
+  const a=APPPRAC[id], m=MOD[a.mod]; let tries=0;
+  const opts=shuffle(a.rows.map(r=>r[1]));let order=a.flow?shuffle(a.flow.map(f=>f[0])):null;if(order&&order.join()===a.flow.map(f=>f[0]).join())order.reverse();
+  const draw=(res)=>{
+    $('#view').innerHTML=`<div class="spread"><div><div class="eyebrow">Simulator bab · ${m.code} · Bab ${a.bab+1}</div><h1 style="font-size:28px">${esc(a.title)}</h1></div><button class="btn ghost sm" id="apBack">← Kembali ke modul</button></div>
+    <p class="lead">Aplikasi ini tidak berjalan di SAP GUI, jadi latihannya mensimulasikan pekerjaan nyata: memilih aplikasi untuk tiap kebutuhan${a.flow?' dan menyusun urutan proses':''}.</p>
+    <div class="card" style="margin-top:14px"><b>Tugas 1 · Cocokkan aplikasi dengan kebutuhannya</b>${a.rows.map((r,i)=>`<div class="chk" style="align-items:center"><span style="min-width:200px"><b>${esc(r[0])}</b></span><select data-i="${i}" aria-label="Fungsi ${esc(r[0])}" style="flex:1"><option value="">pilih fungsi</option>${opts.map(o=>`<option ${res&&res.sel[i]===o?'selected':''}>${esc(o)}</option>`).join('')}</select><span class="apr" style="width:80px">${res?(res.sel[i]===r[1]?'<span class="pill ok">Benar</span>':'<span class="pill bad">Salah</span>'):''}</span></div>`).join('')}</div>
+    ${a.flow?`<div class="card" style="margin-top:14px"><b>Tugas 2 · Susun urutan proses</b><ol class="order-list">${order.map((t,i)=>`<li class="${res?(t===a.flow[i][0]?'right':'wrong'):''}"><span class="ix">${i+1}</span><span class="tx">${esc(t)}</span><button class="mv" data-u="${i}" aria-label="Naikkan" ${i===0?'disabled':''}>↑</button><button class="mv" data-d="${i}" aria-label="Turunkan" ${i===order.length-1?'disabled':''}>↓</button></li>`).join('')}</ol></div>`:''}
+    <div class="row" style="margin-top:14px"><button class="btn" id="apChk">Periksa</button><span id="apRes">${res?res.msg:''}</span></div>`;
+    const sel=()=>$$('select[data-i]').map(s=>s.value);
+    $('#apBack').onclick=()=>{MODV={id:a.mod,view:'p'+a.bab};go('modul-'+a.mod);};
+    $$('[data-u]').forEach(b=>b.onclick=()=>{const i=+b.dataset.u;const s=sel();[order[i-1],order[i]]=[order[i],order[i-1]];draw({sel:s,msg:'',keep:1});});
+    $$('[data-d]').forEach(b=>b.onclick=()=>{const i=+b.dataset.d;const s=sel();[order[i+1],order[i]]=[order[i],order[i+1]];draw({sel:s,msg:'',keep:1});});
+    if(res&&res.keep){$$('.apr').forEach(x=>x.innerHTML='');$$('.order-list li').forEach(x=>x.className='');}
+    $('#apChk').onclick=()=>{tries++;const s=sel();const okA=a.rows.filter((r,i)=>s[i]===r[1]).length;const okF=a.flow?order.filter((t,i)=>t===a.flow[i][0]).length:0;const tot=a.rows.length+(a.flow?a.flow.length:0);const pct=Math.round((okA+okF)/tot*100);
+      let msg;if(pct===100){const stars=tries===1?3:tries<=3?2:1;S.sims[id]=Math.max(simStars(id),stars);logAtt('sim:'+id,stars);save();renderNav('modul-'+a.mod);msg=`<span class="pill ok">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</span> Semua benar. <button class="btn sm" id="apDone">Kembali ke praktik bab</button>`;}
+      else msg=`<span class="pill warn">${pct}% benar</span> Perbaiki yang salah lalu periksa lagi.`;
+      draw({sel:s,msg});$('#apDone')&&($('#apDone').onclick=()=>{MODV={id:a.mod,view:'p'+a.bab};go('modul-'+a.mod);});};
+  };
+  location.hash!=='#simulator'&&history.replaceState(null,'',location.hash);
+  draw();window.scrollTo(0,0);
+}
+
+/* ===================== STUDI KASUS ===================== */
+function renderCaseHome(){
+  const r=roleOf();
+  const mods=MODULES.filter(m=>r?(relOf(m.id,r)||S.addons.includes(m.id)):true);
+  $('#view').innerHTML=`<div class="eyebrow">Praktik</div><h1>Studi Kasus</h1><p class="lead">Dua tingkat studi kasus: <b>studi kasus role</b> (lintas modul, sesuai pekerjaanmu) dan <b>studi kasus per bab</b> (sesuai isi tiap bab di modul). Setiap pilihan punya umpan balik.</p>
+  ${r?`<h2>Studi kasus role: ${esc(r.t)}</h2><div class="scen-list">${roleCases(r).map(caseCard).join('')}</div>
+  <h2>Kasus terpadu (keputusan + praktik SAP)</h2><div class="scen-list">${roleSims(r).filter(id=>id.startsWith('k')).map(id=>simCard(SIMS.find(x=>x.id===id))).join('')||'<p class="muted">Belum ada kasus terpadu untuk modul jalur ini.</p>'}</div>`:
+  `<div class="outpath" style="margin-top:14px">Pilih role untuk membuka studi kasus role. <a href="#role">Pilih role</a></div><h2>Studi kasus lintas modul</h2><div class="scen-list">${[...ROLECASES,...CASES].map(caseCard).join('')}</div>`}
+  <h2>Studi kasus per bab</h2><p class="muted" style="max-width:72ch">${r?'Modul jalurmu dan add-on.':'Semua modul.'} Studi kasus bab juga ada di menu praktik setiap bab di halaman modul.</p>
+  ${mods.map(m=>`<details class="simgrp"><summary><b>${m.code}</b> ${esc(shortT(m))} ${relPill(relOrAdd(m.id))}<span class="muted" style="margin-left:auto;font-size:13px">${mastery(m).caseB}/${m.lessons.length} bab</span></summary><div class="scen-list" style="margin:10px 0 4px">${BAB[m.id].map(b=>caseCard(b.case)).join('')}</div></details>`).join('')}`;
+  bindAll($('#view'));
+}
+function playCase(id){
+  const c=ALLCASES.find(x=>x.id===id);let i=0,score=0,firstTry=true;const log=[];
+  const back=()=>{if(c.back&&c.back.startsWith('modul-')){MODV={id:c.mod,view:'p'+c.bab};go(c.back);}else if(c.kind==='role'&&roleOf()&&location.hash==='#jalur'){JV='kasus';route();}else renderCaseHome();};
+  const label=c.kind==='bab'?`Studi kasus bab · ${MOD[c.mod].code} · Bab ${c.bab+1}`:c.role?'Studi kasus role':'Studi kasus · '+c.tag;
+  const draw=(fb)=>{const st=c.steps[i];
+    $('#view').innerHTML=`<div class="spread"><div><div class="eyebrow">${label}</div><h1 style="font-size:28px">${esc(c.title)}</h1></div><button class="btn ghost sm" id="csBack">← Kembali</button></div>
+    <div class="card case-scene" style="margin-top:14px"><b>Situasi</b><p>${esc(c.scene)}</p></div>
+    ${log.length?`<div class="case-log">${log.map(l=>`<p>✓ ${esc(l)}</p>`).join('')}</div>`:''}
+    ${st?`<div class="q"><div class="q-h">Keputusan ${i+1} dari ${c.steps.length}: ${esc(st.q)}</div>${st.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o[0])}</button>`).join('')}${fb?`<div class="exp">${fb}</div>`:''}</div>`:
+    `<div class="result"><b style="font-size:20px">Kasus selesai</b><p>Benar pada percobaan pertama: <b>${score}/${c.steps.length}</b>.</p><div class="row"><button class="btn sm" id="csAgain">Ulangi</button><button class="btn sm ghost" id="csList">${c.kind==='bab'?'Kembali ke praktik bab':'Kasus lain'}</button></div></div>`}`;
+    $('#csBack').onclick=back;
+    if(!st){S.cases[c.id]=Math.max(S.cases[c.id]||0,score);logAtt('case:'+c.id,score/c.steps.length*100);renderNav((location.hash||'#').slice(1));$('#csAgain').onclick=()=>playCase(id);$('#csList').onclick=back;return;}
+    $$('.opt').forEach(b=>b.onclick=()=>{const o=st.o[+b.dataset.j];
+      if(o[1]){if(firstTry)score++;log.push(o[0]+' — '+o[2]);i++;firstTry=true;draw();}
+      else{firstTry=false;draw(`<b style="color:var(--bad)">Kurang tepat.</b> ${esc(o[2])} Coba pilih lagi.`);}});};
+  draw();window.scrollTo(0,0);
+}
+
+/* ===================== GLOSARIUM ===================== */
+function renderGloss(root,opt){
+  opt=opt||{};const r=roleOf();let scope=opt.scope||(r?'jalur':'all'),type='Semua',q='';
+  const inScope=g=>scope==='all'||(scope==='jalur'?g.mods.some(x=>rolePath(r).includes(x)||S.addons.includes(x)):g.mods.includes(scope));
+  const types=['Semua','T-code','App','Istilah','Movement type'];
+  root.innerHTML=`${opt.embed?'':`<div class="eyebrow">Hafalan</div><h1>Glosarium</h1><p class="lead">${GLOSS.length} entri T-code, aplikasi, istilah, dan movement type. Daftar ini disusun otomatis dari isi materi, jadi setiap T-code atau istilah baru di materi langsung muncul di sini dan di flashcard.</p>`}
+  <div class="filt" style="margin-top:14px">${opt.embed?'':`<select id="glS" aria-label="Cakupan">${r?`<option value="jalur">Jalur ${esc(r.t)} + add-on</option>`:''}<option value="all">Semua modul</option>${MODULES.map(m=>`<option value="${m.id}">${m.code} · ${esc(shortT(m))}</option>`).join('')}</select>`}<input id="glQ" placeholder="Cari kode atau istilah" aria-label="Cari glosarium"></div>
+  <div class="chips" id="glT">${types.map(t=>`<button class="chip ${t===type?'on':''}" data-t="${t}">${t}</button>`).join('')}</div><p class="muted" id="glN" style="font-size:13px"></p><div id="glL"></div>`;
+  const draw=()=>{const list=GLOSS.filter(g=>inScope(g)&&(type==='Semua'||g.t===type)&&(!q||(g.k+' '+g.d).toLowerCase().includes(q)));
+    $('#glN',root).textContent=`${list.length} entri · ${list.filter(g=>S.cards[g.k]).length} sudah ditandai hafal`;
+    $('#glL',root).innerHTML=list.length?`<div class="tbl-wrap"><table><tr><th style="width:24%">Kode / istilah</th><th style="width:13%">Jenis</th><th>Arti</th><th style="width:16%">Modul</th><th style="width:12%"></th></tr>${list.map(g=>`<tr><td>${g.t==='T-code'||g.t==='Movement type'?tc(esc(g.k)):`<b>${esc(g.k)}</b>`}</td><td><span class="pill">${g.t}</span></td><td>${esc(g.d)}</td><td>${g.mods.map(x=>`<a href="#modul-${x}">${MOD[x].code}</a>`).join(', ')}</td><td>${g.t==='Istilah'?'':`<button class="linkbtn" data-gk="${esc(g.k)}">${S.cards[g.k]?'✓ Hafal':'Tandai hafal'}</button>`}</td></tr>`).join('')}</table></div>`:'<p class="muted">Tidak ada entri yang cocok.</p>';
+    $$('[data-gk]',root).forEach(b=>b.onclick=()=>{S.cards[b.dataset.gk]=!S.cards[b.dataset.gk];save();draw();});};
+  $('#glS',root)&&($('#glS',root).value=scope,$('#glS',root).onchange=e=>{scope=e.target.value;draw();});
+  $('#glQ',root).oninput=e=>{q=e.target.value.toLowerCase();draw();};
+  $$('#glT .chip',root).forEach(b=>b.onclick=()=>{type=b.dataset.t;$$('#glT .chip',root).forEach(x=>x.classList.toggle('on',x===b));draw();});
+  draw();
+}
+
+/* ===================== REPORT ===================== */
+let DL=null;try{window.claude&&window.claude.use&&window.claude.use('downloads').then(d=>{DL=d;const b=$('#rpCsv');if(b)b.hidden=!d;}).catch(()=>{});}catch(e){}
+function reportRows(){const r=roleOf();const ids=r?[...rolePath(r),...S.addons.filter(x=>!relOf(x,r))]:[];const act=MODULES.filter(m=>!ids.includes(m.id)&&(S.les[m.id]||S.att['mx:'+m.id]||S.mq[m.id])).map(m=>m.id);
+  return [...ids,...act].map(id=>{const m=MOD[id],M=mastery(m);const cps=m.lessons.map((_,i)=>S.cpf[id+':'+i]).filter(x=>x!=null);
+    const bs=BAB[id];const stars=bs.map(b=>Math.max(0,...b.sims.map(simStars),b.app?simStars(b.app):0)).filter(x=>x>0);const cs=bs.map(b=>S.cases[b.case.id]!=null?Math.round(S.cases[b.case.id]/b.case.steps.length*100):null).filter(x=>x!=null);
+    return {id,m,M,k:relOrAdd(id),cp:cps.length?`${cps.filter(x=>x).length}/${cps.length}`:'–',stars:stars.length?(stars.reduce((a,x)=>a+x,0)/stars.length).toFixed(1):null,cs:cs.length?Math.round(cs.reduce((a,x)=>a+x,0)/cs.length):null,ex:M.ex,best:M.ex.best!=null?M.ex.best:(M.q||null)};});}
+function renderReport(){
+  const r=roleOf(),p=progress(),rows=reportRows();const rx=r?attOf('rx:'+r.id):null;
+  const firsts=rows.map(x=>x.ex.first).filter(x=>x!=null),bests=rows.map(x=>x.best).filter(x=>x!=null);const avg=a=>a.length?Math.round(a.reduce((s,x)=>s+x,0)/a.length):null;
+  const status=x=>x.M.done?'<span class="pill ok">Dikuasai</span>':x.best!=null&&x.best<80?'<span class="pill warn">Ujian belum lulus</span>':x.M.les?'<span class="pill ac">Berjalan</span>':'<span class="pill">Belum mulai</span>';
+  const allAtt=Object.entries(S.att).flatMap(([k,a])=>a.map(x=>({k,...x}))).sort((a,b)=>b.t-a.t).slice(0,12);
+  const attName=k=>{const [t,id]=[k.split(':')[0],k.slice(k.indexOf(':')+1)];if(t==='mx')return 'Ujian akhir '+MOD[id].code;if(t==='rx')return 'Ujian akhir role '+((ROLES.find(x=>x.id===id)||{}).t||'');if(t==='case'){const c=ALLCASES.find(x=>x.id===id);return 'Studi kasus: '+(c?c.title:id);}if(t==='sim'){const s=SIMS.find(x=>x.id===id)||APPPRAC[id];return 'Simulator: '+(s?s.title:id);}return k;};
+  const attVal=x=>x.k.startsWith('sim:')?'★'.repeat(x.s)+'☆'.repeat(3-x.s):x.s+'%';
+  $('#view').innerHTML=`<div class="eyebrow">Hasil belajar</div><h1>Report nilai</h1><p class="lead">Penilaian per modul: cek pemahaman tiap bab, simulator bab, studi kasus bab, dan ujian akhir (nilai percobaan pertama dan nilai tertinggi).${r?` Role: <b>${esc(r.t)}</b>.`:''}</p>
+  <div class="grid g3" style="margin-top:16px"><div class="card stat"><b>${p.pct}%</b><span>progres ${r?'kompetensi role':'keseluruhan'}</span></div><div class="card stat"><b>${r?p.done+'/'+p.core:p.all+'/'+MODULES.length}</b><span>modul dikuasai</span></div><div class="card stat"><b>${sc(avg(firsts))} → ${sc(avg(bests))}</b><span>rata-rata ujian modul: pertama → tertinggi</span></div>
+  ${r?`<div class="card stat"><b>${sc(rx.first)} → ${sc(rx.best)}</b><span>ujian akhir role (${rx.n}× percobaan)</span></div>`:''}<div class="card stat"><b>${p.s}</b><span>simulator diselesaikan</span></div><div class="card stat"><b>${p.c}</b><span>studi kasus diselesaikan</span></div></div>
+  <div class="row" style="margin-top:14px"><button class="btn sm ghost" id="rpCsv" ${DL?'':'hidden'}>Unduh CSV</button><button class="btn sm ghost" id="rpPrint">Cetak / simpan PDF</button></div>
+  <h2>Nilai per modul</h2>
+  ${rows.length?`<div class="tbl-wrap"><table class="rptbl"><tr><th>Modul</th><th>Bab</th><th>Cek pemahaman<br><small>benar di percobaan pertama</small></th><th>Simulator bab<br><small>selesai · rata² bintang</small></th><th>Studi kasus bab<br><small>selesai · rata² skor</small></th><th>Ujian: pertama</th><th>Ujian: tertinggi</th><th>Percobaan</th><th>Terakhir</th><th>Status</th></tr>
+  ${rows.map(x=>`<tr><td><a href="#modul-${x.id}"><b>${x.m.code}</b></a> ${relPill(x.k)}<br><small>${esc(shortT(x.m))}</small></td><td class="n">${x.M.les}/${x.M.L}</td><td class="n">${x.cp}</td><td class="n">${x.M.simB}/${x.M.L}${x.stars?` · ${x.stars}★`:''}</td><td class="n">${x.M.caseB}/${x.M.L}${x.cs!=null?` · ${x.cs}%`:''}</td><td class="n">${sc(x.ex.first)}</td><td class="n"><b>${sc(x.best)}</b>${x.best!=null?`<div class="mbar"><i style="width:${x.best}%"></i>${x.ex.first!=null?`<s style="left:${x.ex.first}%"></s>`:''}</div>`:''}</td><td class="n">${x.ex.n}</td><td>${fmtD(x.ex.last&&x.ex.last.t)}</td><td>${status(x)}</td></tr>`).join('')}</table></div>
+  <p class="muted" style="font-size:12.5px">Garis tipis di bar = nilai pertama; bar biru = nilai tertinggi. Nilai pertama hanya tercatat untuk ujian yang dikerjakan setelah fitur report aktif.</p>`:'<p class="muted">Belum ada data. Pilih role atau mulai satu modul.</p>'}
+  <h2>Aktivitas terakhir</h2>${allAtt.length?`<div class="tbl-wrap"><table><tr><th>Tanggal</th><th>Aktivitas</th><th>Hasil</th></tr>${allAtt.map(x=>`<tr><td>${new Date(x.t).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td><td>${esc(attName(x.k))}</td><td>${attVal(x)}</td></tr>`).join('')}</table></div>`:'<p class="muted">Belum ada aktivitas yang dinilai.</p>'}`;
+  $('#rpPrint').onclick=()=>window.print();
+  $('#rpCsv').onclick=()=>{const h=['Modul','Kode','Kategori role','Bab selesai','Cek pemahaman benar pertama','Simulator bab selesai','Studi kasus bab selesai','Skor kasus rata2','Ujian pertama','Ujian tertinggi','Percobaan','Terakhir','Dikuasai'];
+    const csv=[h,...rows.map(x=>[shortT(x.m),x.m.code,x.k?REL[x.k][0]:'',`${x.M.les}/${x.M.L}`,x.cp,`${x.M.simB}/${x.M.L}`,`${x.M.caseB}/${x.M.L}`,x.cs??'',x.ex.first??'',x.best??'',x.ex.n,x.ex.last?new Date(x.ex.last.t).toISOString().slice(0,10):'',x.M.done?'Ya':'Tidak'])].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    DL&&DL.save({filename:'report-akademi-sap.csv',data:'\ufeff'+csv}).catch(()=>{});};
+}
+
+/* ===================== UJIAN (hub) ===================== */
+function renderQuizHome(){
+  const r=roleOf();const ids=r?[...roleCore(r),...S.addons.filter(x=>!relOf(x,r))]:ORDER;
+  const cats=[...['Movement','T-code','Pembelian','Opname','Aset','Proyek','Navigasi'].map(c=>[c,c,QBANK.filter(q=>q.c===c).length]),['Urutan','Urutan transaksi',OBANK.length]];
+  const rx=r?attOf('rx:'+r.id):null;
+  $('#view').innerHTML=`<div class="eyebrow">Uji pemahaman</div><h1>Ujian</h1><p class="lead">Setiap modul punya <b>ujian akhir modul</b>. ${r?`Role ${esc(r.t)} juga punya <b>ujian akhir role</b> dari semua kompetensi inti dan general.`:'Pilih role untuk membuka ujian akhir role.'}</p>
+  ${r?`<div class="card" style="margin-top:14px"><div class="spread"><b style="font-size:18px">Ujian akhir role · ${esc(r.t)}</b><button class="btn sm" id="toRx">Buka ujian role</button></div><p class="muted" style="margin:6px 0 0">Nilai pertama ${sc(rx.first)} · tertinggi ${sc(rx.best)} · ${rx.n}× percobaan</p></div>`:''}
+  <h2>Ujian akhir modul</h2><div class="tbl-wrap"><table><tr><th>Modul</th><th>Syarat</th><th>Pertama</th><th>Tertinggi</th><th>Percobaan</th><th></th></tr>${ids.map(id=>{const m=MOD[id],M=mastery(m);return `<tr><td><b>${m.code}</b> ${relPill(relOrAdd(id))}<br><small>${esc(shortT(m))}</small></td><td>${M.les>=M.L?'<span class="pill ok">Terbuka</span>':`<span class="pill">Bab ${M.les}/${M.L}</span>`}</td><td>${sc(M.ex.first)}</td><td><b>${sc(M.ex.best!=null?M.ex.best:(M.q||null))}</b></td><td>${M.ex.n}</td><td><button class="linkbtn" data-mx="${id}">${M.les>=M.L?'Kerjakan':'Buka modul'}</button></td></tr>`;}).join('')}</table></div>
+  <h2>Bank soal latihan MM & proyek</h2><div class="card"><div class="chips" id="qcats">${cats.map((c,i)=>`<button class="chip ${i===0?'on':''}" data-c="${c[0]}">${c[1]} <span style="opacity:.7">(${c[2]})</span></button>`).join('')}</div><div class="row"><button class="btn" id="qStart">Mulai latihan</button><span style="font-size:13px;color:var(--muted)">Latihan tidak memengaruhi nilai.</span></div></div><div id="qArea"></div>`;
+  $('#toRx')&&($('#toRx').onclick=()=>{JV='ujian';location.hash='jalur';});
+  $$('[data-mx]').forEach(b=>b.onclick=()=>{const m=MOD[b.dataset.mx],M=mastery(m);MODV={id:m.id,view:M.les>=M.L?'exam':'l'+Math.min(M.les,M.L-1)};location.hash='modul-'+m.id;});
+  let cat='Movement';$$('#qcats .chip').forEach(b=>b.onclick=()=>{cat=b.dataset.c;$$('#qcats .chip').forEach(x=>x.classList.toggle('on',x===b));});
+  $('#qStart').onclick=()=>startQuiz(cat);
+}
+function startQuiz(cat){
+  let mc=[],ord=[];
+  if(cat==='Urutan')ord=OBANK.slice(); else mc=QBANK.filter(q=>q.c===cat).map(shufQ);
+  const total=mc.length+ord.length;let done=0,correct=0;const area=$('#qArea');
+  area.innerHTML=`<div id="qMC"></div><div id="qORD"></div><div class="result" id="qFinal" hidden></div>`;
+  const finish=()=>{if(done<total)return;const s=Math.round(correct/total*100);const f=$('#qFinal');f.hidden=false;f.innerHTML=`<b style="font-size:20px">Skor: ${correct}/${total} (${s}%)</b><p>Latihan selesai.</p><button class="btn sm" id="qRe">Ulangi</button>`;$('#qRe').onclick=()=>startQuiz(cat);f.scrollIntoView({behavior:'smooth',block:'center'});};
+  const mcEl=$('#qMC');
+  mcEl.innerHTML=mc.map((q,i)=>`<div class="q" data-i="${i}"><div class="q-h">${i+1}. ${esc(q.q)}</div>${q.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o)}</button>`).join('')}<div class="exp" hidden></div></div>`).join('');
+  $$('.q',mcEl).forEach(box=>{const q=mc[+box.dataset.i];$$('.opt',box).forEach(b=>b.onclick=()=>{const ok=+b.dataset.j===q.a;$$('.opt',box).forEach(x=>{x.disabled=true;if(+x.dataset.j===q.a)x.classList.add('right');});if(!ok)b.classList.add('wrong');const ex=$('.exp',box);ex.hidden=false;ex.innerHTML=`<b style="color:${ok?'var(--ok)':'var(--bad)'}">${ok?'Benar.':'Belum tepat.'}</b> ${esc(q.e)}`;done++;if(ok)correct++;finish();});});
+  const oEl=$('#qORD');
+  ord.forEach((o,oi)=>{const box=document.createElement('div');box.className='q';oEl.appendChild(box);let cur=shuffle(o.items);if(cur.join()===o.items.join())cur=cur.reverse();let locked=false;
+    const draw=()=>{box.innerHTML=`<div class="q-h">${mc.length+oi+1}. ${esc(o.q)}</div><ol class="order-list">${cur.map((t,i)=>`<li class="${locked?(t===o.items[i]?'right':'wrong'):''}"><span class="ix">${i+1}</span><span class="tx">${esc(t)}</span>${locked?'':`<button class="mv" data-u="${i}" aria-label="Naikkan" ${i===0?'disabled':''}>↑</button><button class="mv" data-d="${i}" aria-label="Turunkan" ${i===cur.length-1?'disabled':''}>↓</button>`}</li>`).join('')}</ol>${locked?`<div class="exp">Urutan benar: ${o.items.map((t,i)=>`${i+1}) ${esc(t)}`).join(' → ')}</div>`:'<button class="btn sm" data-chk>Periksa urutan</button>'}`;
+      $$('[data-u]',box).forEach(b=>b.onclick=()=>{const i=+b.dataset.u;[cur[i-1],cur[i]]=[cur[i],cur[i-1]];draw();});
+      $$('[data-d]',box).forEach(b=>b.onclick=()=>{const i=+b.dataset.d;[cur[i+1],cur[i]]=[cur[i],cur[i+1]];draw();});
+      const c=$('[data-chk]',box);if(c)c.onclick=()=>{locked=true;const ok=cur.join('|')===o.items.join('|');done++;if(ok)correct++;draw();finish();};};
+    draw();});
+  area.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function shufQ(q){const idx=shuffle(q.o.map((_,i)=>i));return {q:q.q,o:idx.map(i=>q.o[i]),a:idx.indexOf(q.a),e:q.e};}
 /* ===================== MC QUIZ ===================== */
 function runMC(el,qs,onDone){
   let answered=0,correct=0;
@@ -3464,51 +4046,19 @@ scurve(w){
   draw();}
 };
 
-/* ===================== QUIZ VIEW ===================== */
-function examPool(){const r=roleOf();const ids=r?roleCore(r):ORDER;return ids.flatMap(id=>MOD[id].quiz.map(q=>Object.assign({},q,{mod:id})));}
-function renderQuizHome(){
-  const r=roleOf(); const best=r?((S.quiz.r||{})[r.id]||0):(S.quiz.best||0);
-  const cats=[['Ujian',r?'Ujian jalur':'Ujian campuran',15],...['Movement','T-code','Pembelian','Opname','Aset','Proyek','Navigasi'].map(c=>[c,'MM & proyek: '+c,QBANK.filter(q=>q.c===c).length]),['Urutan','Urutan transaksi MM',OBANK.length]];
-  $('#view').innerHTML=`<div class="eyebrow">Uji pemahaman</div><h1>Kuis & Ujian</h1><p class="lead">${r?`<b>Ujian jalur ${esc(r.t)}</b>: 15 soal acak dari modul wajib dan general jalurmu`:'<b>Ujian campuran</b>: 15 soal acak dari semua modul'}, lulus ≥ 80%. Skor terbaik: <b>${best}%</b>${best>=80?' <span class="pill ok">Lulus</span>':''}. Kuis per modul ada di halaman masing-masing modul.</p>
-  <div class="card" style="margin-top:14px"><b style="font-size:17px">Pilih ujian atau latihan</b><div class="chips" id="qcats">${cats.map((c,i)=>`<button class="chip ${i===0?'on':''}" data-c="${c[0]}">${c[1]} <span style="opacity:.7">(${c[2]})</span></button>`).join('')}</div>
-  <div class="row"><button class="btn" id="qStart">Mulai</button><span style="font-size:13px;color:var(--muted)">Hanya skor ujian ${r?'jalur':'campuran'} yang dicatat di progres.</span></div></div><div id="qArea"></div>`;
-  let cat='Ujian';
-  $$('#qcats .chip').forEach(b=>b.onclick=()=>{cat=b.dataset.c;$$('#qcats .chip').forEach(x=>x.classList.toggle('on',x===b));});
-  $('#qStart').onclick=()=>startQuiz(cat);
-}
-function startQuiz(cat){
-  let mc=[],ord=[];const r=roleOf();
-  if(cat==='Ujian'){mc=shuffle(examPool()).slice(0,15).map(q=>Object.assign(shufQ(q),{mod:q.mod}));}
-  else if(cat==='Urutan')ord=OBANK.slice(); else mc=QBANK.filter(q=>q.c===cat).map(shufQ);
-  const total=mc.length+ord.length;let done=0,correct=0;const area=$('#qArea');
-  area.innerHTML=`<div id="qMC"></div><div id="qORD"></div><div class="result" id="qFinal" hidden></div>`;
-  const finish=()=>{if(done<total)return;const sc=Math.round(correct/total*100);if(cat==='Ujian'){if(r){S.quiz.r=S.quiz.r||{};S.quiz.r[r.id]=Math.max(S.quiz.r[r.id]||0,sc);}else S.quiz.best=Math.max(S.quiz.best||0,sc);save();renderNav('kuis');}const f=$('#qFinal');f.hidden=false;
-    const miss=cat==='Ujian'?[...new Set(mc.filter((q,i)=>$(`#qMC .q[data-i="${i}"] .opt.wrong`)).map(q=>q.mod))]:[];
-    f.innerHTML=`<b style="font-size:20px">Skor: ${correct}/${total} (${sc}%)</b> ${sc>=80?'<span class="pill ok">Lulus</span>':'<span class="pill bad">Belum lulus</span>'}<p>${sc>=80?'Bagus! Pemahamanmu sudah kuat.':'Ulangi modul yang soalnya banyak salah, lalu coba lagi.'}</p>${miss.length?`<p style="font-size:14px">Ulas modul: ${miss.map(id=>`<a href="#modul-${id}">${MOD[id].code}</a>`).join(', ')}</p>`:''}<button class="btn sm" id="qRe">Ulangi</button>`;$('#qRe').onclick=()=>startQuiz(cat);f.scrollIntoView({behavior:'smooth',block:'center'});};
-  const mcEl=$('#qMC');
-  mcEl.innerHTML=mc.map((q,i)=>`<div class="q" data-i="${i}"><div class="spread"><div class="q-h">${i+1}. ${esc(q.q)}</div>${q.mod?`<span class="pill">${MOD[q.mod].code}</span>`:''}</div>${q.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o)}</button>`).join('')}<div class="exp" hidden></div></div>`).join('');
-  $$('.q',mcEl).forEach(box=>{const q=mc[+box.dataset.i];$$('.opt',box).forEach(b=>b.onclick=()=>{const ok=+b.dataset.j===q.a;$$('.opt',box).forEach(x=>{x.disabled=true;if(+x.dataset.j===q.a)x.classList.add('right');});if(!ok)b.classList.add('wrong');const ex=$('.exp',box);ex.hidden=false;ex.innerHTML=`<b style="color:${ok?'var(--ok)':'var(--bad)'}">${ok?'Benar.':'Belum tepat.'}</b> ${esc(q.e)}`;done++;if(ok)correct++;finish();});});
-  const oEl=$('#qORD');
-  ord.forEach((o,oi)=>{const box=document.createElement('div');box.className='q';oEl.appendChild(box);let cur=shuffle(o.items);if(cur.join()===o.items.join())cur=cur.reverse();let locked=false;
-    const draw=()=>{box.innerHTML=`<div class="q-h">${mc.length+oi+1}. ${esc(o.q)}</div><ol class="order-list">${cur.map((t,i)=>`<li class="${locked?(t===o.items[i]?'right':'wrong'):''}"><span class="ix">${i+1}</span><span class="tx">${esc(t)}</span>${locked?'':`<button class="mv" data-u="${i}" aria-label="Naikkan" ${i===0?'disabled':''}>↑</button><button class="mv" data-d="${i}" aria-label="Turunkan" ${i===cur.length-1?'disabled':''}>↓</button>`}</li>`).join('')}</ol>${locked?`<div class="exp">Urutan benar: ${o.items.map((t,i)=>`${i+1}) ${esc(t)}`).join(' → ')}</div>`:'<button class="btn sm" data-chk>Periksa urutan</button>'}`;
-      $$('[data-u]',box).forEach(b=>b.onclick=()=>{const i=+b.dataset.u;[cur[i-1],cur[i]]=[cur[i],cur[i-1]];draw();});
-      $$('[data-d]',box).forEach(b=>b.onclick=()=>{const i=+b.dataset.d;[cur[i+1],cur[i]]=[cur[i],cur[i+1]];draw();});
-      const c=$('[data-chk]',box);if(c)c.onclick=()=>{locked=true;const ok=cur.join('|')===o.items.join('|');done++;if(ok)correct++;draw();finish();};};
-    draw();});
-  area.scrollIntoView({behavior:'smooth',block:'start'});
-}
-
 /* ===================== FLASHCARDS ===================== */
 const CARD_MOD={Beli:'mm-pur',Stok:'mm-im','Data induk':'org',Opname:'mm-pi',Aset:'fi-aa',Proyek:'ps',PM:'pm'};
 const ALLCARDS=(()=>{const out=CARDS.map(c=>[c[0],c[1],CARD_MOD[c[2]]||'mm-im',c[3]]);const seen=new Set(out.map(c=>c[0]));
-  MODULES.forEach(m=>m.lessons.forEach(l=>(l.tcRows||[]).forEach(([codes,desc])=>codes.split(' / ').forEach(c=>{c=c.trim();if(/\s/.test(c)||!/^[A-Z0-9_\/\-\.(]+$/.test(c)||seen.has(c))return;seen.add(c);out.push([c,KNOWN[c]||(m.code+' · '+shortT(m)),m.id,desc.replace(/<[^>]+>/g,'')]);}))));return out;})();
-function renderCards(){
+  MVT.forEach(([k,d])=>{seen.add(k);out.push([k,'Movement type '+k,'mm-im',d]);});
+  MODULES.forEach(m=>m.lessons.forEach(l=>(l.tcRows||[]).forEach(([codes,desc])=>codes.split(' / ').forEach(c=>{c=c.trim();if(!isCode(c)||seen.has(c))return;seen.add(c);out.push([c,KNOWN[c]||(m.code+' · '+shortT(m)),m.id,desc.replace(/<[^>]+>/g,'')]);}))));return out;})();
+function renderCards(root,opt){
+  root=root||$('#view');opt=opt||{};
   const r=roleOf();let cat=r?'jalur':'all',q='',hideKnown=false,mode='cards';
-  const inCat=c=>cat==='all'||(cat==='jalur'?!!relOf(c[2],r):c[2]===cat);
-  const shell=()=>{$('#view').innerHTML=`<div class="eyebrow">Hafalan</div><h1>Flashcard T-code</h1><p class="lead">${ALLCARDS.length} kartu dari semua modul. Mode <b>Kartu</b> untuk membaca dan membalik. Mode <b>Latihan ketik</b> menguji ingatanmu: baca fungsinya, ketik T-code-nya.</p>
+  const inCat=c=>cat==='all'||(cat==='jalur'?(!!relOf(c[2],r)||S.addons.includes(c[2])):c[2]===cat);
+  const shell=()=>{root.innerHTML=`${opt.embed?'':`<div class="eyebrow">Hafalan</div><h1>Flashcard</h1><p class="lead">${ALLCARDS.length} kartu T-code dan movement type, disusun otomatis dari materi semua modul. Mode <b>Kartu</b> untuk membaca dan membalik. Mode <b>Latihan ketik</b>: baca fungsinya, ketik kodenya.</p>`}
     <div class="chips"><button class="chip ${mode==='cards'?'on':''}" data-m="cards">Kartu</button><button class="chip ${mode==='drill'?'on':''}" data-m="drill">Latihan ketik</button></div>
-    <div class="filt"><label for="fcCat" class="muted" style="font-size:13px">Kartu dari</label><select id="fcCat">${r?`<option value="jalur" ${cat==='jalur'?'selected':''}>Jalur ${esc(r.t)}</option>`:''}<option value="all" ${cat==='all'?'selected':''}>Semua modul</option>${MODULES.filter(m=>ALLCARDS.some(c=>c[2]===m.id)).map(m=>`<option value="${m.id}" ${cat===m.id?'selected':''}>${m.code} · ${esc(shortT(m))}</option>`).join('')}</select></div><div id="fcArea"></div>`;
-    $$('[data-m]').forEach(b=>b.onclick=()=>{mode=b.dataset.m;shell();});$('#fcCat').onchange=e=>{cat=e.target.value;shell();};mode==='cards'?cardsView():drillView();};
+    <div class="filt"><label for="fcCat" class="muted" style="font-size:13px">Kartu dari</label><select id="fcCat">${r?`<option value="jalur" ${cat==='jalur'?'selected':''}>Jalur ${esc(r.t)} + add-on</option>`:''}<option value="all" ${cat==='all'?'selected':''}>Semua modul</option>${MODULES.filter(m=>ALLCARDS.some(c=>c[2]===m.id)).map(m=>`<option value="${m.id}" ${cat===m.id?'selected':''}>${m.code} · ${esc(shortT(m))}</option>`).join('')}</select></div><div id="fcArea"></div>`;
+    $$('[data-m]',root).forEach(b=>b.onclick=()=>{mode=b.dataset.m;shell();});$('#fcCat',root).onchange=e=>{cat=e.target.value;shell();};mode==='cards'?cardsView():drillView();};
   const cardsView=()=>{
     $('#fcArea').innerHTML=`<div class="filt"><input id="fcQ" value="${esc(q)}" placeholder="Cari T-code / fungsi" aria-label="Cari flashcard"><label style="font-size:13px"><input type="checkbox" id="fcHide" ${hideKnown?'checked':''}> Sembunyikan yang sudah hafal</label></div>
     <p id="fcCount" style="font-size:13px;color:var(--muted)"></p><div class="fc-grid" id="fcGrid"></div>`;
@@ -3531,33 +4081,6 @@ function renderCards(){
       $('#drAgain')&&($('#drAgain').onclick=drillView);};
     draw();};
   shell();
-}
-
-/* ===================== CASE STUDIES ===================== */
-function renderCaseHome(){
-  const K=SIMS.filter(x=>x.kase);
-  $('#view').innerHTML=`<div class="eyebrow">Praktik</div><h1>Studi Kasus</h1><p class="lead">Situasi nyata dari pekerjaan sehari-hari. Saat ini studi kasus berfokus pada MM, PS, dan aset; kasus modul lain ada dalam bentuk skenario simulator dan kuis. Ada dua jenis: <b>studi kasus terpadu</b> yang mencampur keputusan dengan praktik langsung di SAP, dan <b>studi kasus keputusan</b> untuk melatih cara berpikir.</p>
-  <h2>Studi kasus terpadu: keputusan + praktik SAP</h2><p class="muted" style="max-width:72ch">Setiap kasus berganti antara pertanyaan keputusan (dengan umpan balik untuk setiap pilihan) dan transaksi di simulator SAP GUI. Kamu perlu login sekali (client 800).</p>
-  <div class="scen-list">${K.map(simCard).join('')}</div>
-  <h2>Studi kasus keputusan</h2>
-  <div class="scen-list">${CASES.map(c=>`<button class="scen" data-case="${c.id}"><span class="row"><span class="pill">${MOD[c.mod].code}</span>${relPill(relOf(c.mod))}<span class="pill">${c.tag}</span>${S.cases[c.id]!=null?`<span class="pill ok">Skor ${S.cases[c.id]}/${c.steps.length}</span>`:''}</span><b>${c.title}</b><small>${c.steps.length} keputusan</small></button>`).join('')}</div>`;
-  $$('[data-case]').forEach(b=>b.onclick=()=>playCase(b.dataset.case));
-  bindSimCards();
-}
-function playCase(id){
-  const c=CASES.find(x=>x.id===id);let i=0,score=0,firstTry=true;const log=[];
-  const draw=(fb)=>{const st=c.steps[i];
-    $('#view').innerHTML=`<div class="spread"><div><div class="eyebrow">Studi kasus · ${c.tag}</div><h1 style="font-size:28px">${c.title}</h1></div><button class="btn ghost sm" id="csBack">← Semua kasus</button></div>
-    <div class="card case-scene" style="margin-top:14px"><b>Situasi</b><p>${esc(c.scene)}</p></div>
-    ${log.length?`<div class="case-log">${log.map(l=>`<p>✓ ${esc(l)}</p>`).join('')}</div>`:''}
-    ${st?`<div class="q"><div class="q-h">Keputusan ${i+1} dari ${c.steps.length}: ${esc(st.q)}</div>${st.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o[0])}</button>`).join('')}${fb?`<div class="exp">${fb}</div>`:''}</div>`:
-    `<div class="result"><b style="font-family:var(--font-d);font-size:20px">Kasus selesai</b><p>Benar pada percobaan pertama: <b>${score}/${c.steps.length}</b>.</p><div class="row"><button class="btn sm" id="csAgain">Ulangi</button><button class="btn sm ghost" id="csList">Kasus lain</button></div></div>`}`;
-    $('#csBack').onclick=renderCaseHome;
-    if(!st){S.cases[c.id]=Math.max(S.cases[c.id]||0,score);save();renderNav('studi-kasus');$('#csAgain').onclick=()=>playCase(id);$('#csList').onclick=renderCaseHome;return;}
-    $$('.opt').forEach(b=>b.onclick=()=>{const o=st.o[+b.dataset.j];
-      if(o[1]){if(firstTry)score++;log.push(o[0]+' — '+o[2]);i++;firstTry=true;draw();}
-      else{firstTry=false;draw(`<b style="color:var(--bad)">Kurang tepat.</b> ${esc(o[2])} Coba pilih lagi.`);}});};
-  draw();
 }
 
 /* ===================== REFERENCE ===================== */

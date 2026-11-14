@@ -59,7 +59,7 @@
     v.innerHTML = '<div class="eyebrow">Langkah pertama</div><h1>Pilih role kamu</h1><p class="lead">Role menentukan modul yang terbuka untukmu. Pilihan ini sekali saja; mengganti role nanti lewat persetujuan admin.</p>' +
       RGRP.map(function (g) {
         return '<h2>' + h(g[1]) + '</h2><div class="rolegrid">' + ROLES.filter(function (r) { return r.grp === g[0]; }).map(function (r) {
-          return '<a href="#" class="rolecard" data-r="' + r.id + '"><span class="row"><b>' + h(r.t) + '</b></span><small>' + h(r.d) + '</small><span class="cnt"><span class="pill rel-w">' + r.w.length + ' wajib</span><span class="pill rel-g">' + r.g.length + ' general</span><span class="pill rel-p">' + r.p.length + ' pendukung</span></span></a>';
+          return '<a href="#" class="rolecard" data-r="' + r.id + '"><span class="row"><b>' + h(r.t) + '</b></span><small>' + h(r.d) + '</small><span class="cnt"><span class="pill rel-w">' + r.w.length + ' inti</span><span class="pill rel-g">' + r.g.length + ' general</span><span class="pill rel-p">' + r.p.length + ' pendukung</span></span></a>';
         }).join('') + '</div>';
       }).join('') +
       '<div style="position:sticky;bottom:0;padding:12px 0;background:var(--bg,var(--surface))"><p id="pkMsg" style="color:#b00020;font-size:13px;margin:0 0 6px"></p><button class="btn pri" id="pkGo" disabled style="width:100%">Pilih role dulu</button></div>';

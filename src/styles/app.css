@@ -635,4 +635,24 @@ textarea.note:focus,.inputs input:focus,.drill input:focus,#fcQ:focus{border-col
 .hero .relmini{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .hero .relmini div{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--body)}
 @media (max-width:900px){.relcols{grid-template-columns:1fr}.relcol{border-right:0;border-bottom:1px solid var(--band)}.pathlist a{grid-template-columns:30px 1fr auto}.pathlist .c{display:none}}
+
+/* ===== Bab practice, report, glossary ===== */
+.ltoc button.sub{padding-left:34px;font-size:13px;color:var(--meta)}
+.ltoc button.sub small{color:var(--meta)}
+.ltoc button.sub.on{color:var(--accent)}
+h3.ph{font-size:17px;font-weight:500;margin:22px 0 8px;display:flex;gap:8px;align-items:center}
+details.simgrp{border:1px solid var(--band);border-radius:8px;padding:0 16px;margin:8px 0;background:var(--bg)}
+details.simgrp summary{cursor:pointer;padding:14px 0;display:flex;gap:10px;align-items:center;list-style:none;font-size:15px}
+details.simgrp summary::-webkit-details-marker{display:none}
+details.simgrp summary b{color:var(--accent);font-size:12.5px;min-width:70px}
+details.simgrp[open] summary{border-bottom:1px solid var(--band)}
+.rptbl td,.rptbl th{font-size:13.5px;vertical-align:top}
+.rptbl th small{font-weight:400;color:var(--meta)}
+.rptbl td.n{white-space:nowrap;text-align:left}
+.rptbl td:first-child{min-width:190px}
+.rptbl td:first-child small{display:block;color:var(--meta)}
+.mbar{position:relative;height:6px;background:var(--band);border-radius:3px;margin-top:5px;min-width:70px}
+.mbar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:3px}
+.mbar s{position:absolute;top:-3px;width:2px;height:12px;background:var(--ink)}
+@media print{.side,.crumb,#rpCsv,#rpPrint,.menu-toggle{display:none!important}.app{display:block}.main{padding:0}}
 @media (max-width:900px){.app{grid-template-columns:1fr}.side{border-right:0;border-bottom:1px solid var(--band)}.hero{padding:28px 20px}.hero h1{font-size:36px}.pagehero{padding:24px 20px}h1{font-size:30px}.crumb{height:auto;padding:12px 0;margin-bottom:20px}.main{padding-top:0}}
