@@ -1,10 +1,12 @@
-import { json, err, isAdmin } from "../_lib/auth.js";
+import { json, err } from "../_lib/auth.js";
+import { loadUser, pendingRequests } from "../_lib/access.js";
 
 const MAX = 256 * 1024;
 
 export async function onRequestGet({ env, data }) {
-  const [progress, admin] = await Promise.all([env.DATA.get(`progress:${data.user}`), isAdmin(env, data.user)]);
-  return json({ user: data.user, admin, progress });
+  const [progress, u, all] = await Promise.all([env.DATA.get(`progress:${data.user}`), loadUser(env, data.user), pendingRequests(env)]);
+  const requests = all.filter((r) => r.user === data.user).map(({ id, type, target, at }) => ({ id, type, target, at }));
+  return json({ user: data.user, admin: u?.admin === true, progress, role: u?.role ?? null, roles: u?.roles ?? [], mods: u?.mods ?? [], requests });
 }
 
 async function save({ request, env, data }) {
