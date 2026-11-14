@@ -3790,7 +3790,7 @@ function drawModule(m){
   <div class="spread" style="align-items:flex-end"><h1>${esc(m.title)}</h1><span class="row" style="gap:6px">${k?relPill(k):''}${M.done?'<span class="pill ok">Modul dikuasai</span>':''}</span></div>
   <p class="lead">${m.sum}</p>
   <div class="row" style="margin-top:12px">${mchips(M)}<span class="muted" style="font-size:13px">${M.done?'Modul dikuasai.':'Syarat dikuasai: semua bab lulus cek pemahaman dan ujian akhir ≥ 80%.'}</span></div>
-  ${wl.length?`<p style="margin:10px 0 0;font-size:13px">Kompetensi inti untuk: ${wl.map(x=>`<a href="#role-${x.id}" >${esc(x.t)}</a>`).join(', ')}</p>`:''}</header>
+  ${wl.length?`<p style="margin:10px 0 0;font-size:13px">Kompetensi inti untuk: ${wl.map(x=>`<a href="#role-${x.id}">${esc(x.t)}</a>`).join(', ')}</p>`:''}</header>
   ${banner}
   <div class="mod-layout"><nav class="ltoc" aria-label="Daftar bab"><div class="lt-h">Bab</div>${toc}</nav><div class="lesson">${body}
   <div class="foot-nav">${prev?`<a class="btn ghost" href="#modul-${prev.id}">← ${prev.code}</a>`:'<span></span>'}${next?`<a class="btn ghost" href="#modul-${next.id}">${next.code}: ${esc(shortT(next))} →</a>`:`<a class="btn ghost" href="#${r?'jalur':'kuis'}">${r?'Jalur saya':'Ujian'} →</a>`}</div></div></div>`;
