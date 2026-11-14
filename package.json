@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro build && wrangler dev",
-    "deploy": "astro build && wrangler deploy",
-    "sync": "node scripts/sync-artifact.mjs"
+    "preview": "astro build && wrangler pages dev",
+    "deploy": "astro build && wrangler pages deploy",
+    "sync": "node scripts/sync-artifact.mjs",
+    "test": "node --test \"functions/**/*.test.js\""
   },
   "dependencies": {
     "astro": "7.4.12"

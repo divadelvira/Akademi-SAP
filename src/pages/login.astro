@@ -1,0 +1,59 @@
+---
+import '../styles/app.css';
+---
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Masuk · Akademi SAP Admin Proyek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@350;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px">
+  <form id="f" class="card" style="width:100%;max-width:380px" novalidate>
+    <h1 style="font-size:20px;margin:0 0 4px">Akademi SAP Admin Proyek</h1>
+    <div class="chips" role="tablist" aria-label="Mode">
+      <button type="button" class="chip on" role="tab" aria-selected="true" data-mode="login">Masuk</button>
+      <button type="button" class="chip" role="tab" aria-selected="false" data-mode="register">Daftar</button>
+    </div>
+    <div class="inputs" style="grid-template-columns:1fr">
+      <label>Username<input id="u" name="username" autocomplete="username" required minlength="3" maxlength="32" autocapitalize="none"></label>
+      <label>Password<input id="p" name="password" type="password" autocomplete="current-password" required minlength="8"></label>
+      <label id="invl" hidden>Kode undangan<input id="inv" name="invite" autocomplete="off"></label>
+    </div>
+    <p id="msg" role="alert" aria-live="polite" style="color:#b00020;font-size:13px;min-height:1.3em;margin:10px 0"></p>
+    <button id="go" class="btn" type="submit" style="width:100%">Masuk</button>
+  </form>
+</main>
+<script is:inline>
+  var mode = 'login', f = document.getElementById('f'), msg = document.getElementById('msg'), go = document.getElementById('go');
+  document.querySelectorAll('[data-mode]').forEach(function (t) {
+    t.onclick = function () {
+      mode = t.dataset.mode;
+      document.querySelectorAll('[data-mode]').forEach(function (x) {
+        var on = x === t; x.classList.toggle('on', on); x.setAttribute('aria-selected', on);
+      });
+      document.getElementById('invl').hidden = mode !== 'register';
+      document.getElementById('p').autocomplete = mode === 'register' ? 'new-password' : 'current-password';
+      go.textContent = t.textContent; msg.textContent = '';
+    };
+  });
+  f.onsubmit = function (e) {
+    e.preventDefault();
+    var body = { username: f.username.value.trim(), password: f.password.value };
+    if (mode === 'register') body.invite = f.invite.value.trim();
+    go.disabled = true; msg.textContent = '';
+    fetch('/api/' + mode, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return [r.ok, d]; }); })
+      .then(function (x) {
+        if (x[0]) location.href = '/';
+        else { msg.textContent = x[1].error || 'Terjadi kesalahan'; go.disabled = false; }
+      })
+      .catch(function () { msg.textContent = 'Jaringan bermasalah'; go.disabled = false; });
+  };
+</script>
+</body>
+</html>

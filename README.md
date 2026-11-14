@@ -1,6 +1,6 @@
 # Akademi SAP Admin Proyek
 
-Static Astro 7 site, deployed to Cloudflare Workers static assets via Wrangler. Content was migrated from the Claude artifact "Akademi SAP Admin Proyek".
+Static Astro 7 site, deployed to Cloudflare Pages (Pages Functions handle login and progress). Content was migrated from the Claude artifact "Akademi SAP Admin Proyek".
 
 ## 1. Quick start
 
@@ -10,10 +10,26 @@ Static Astro 7 site, deployed to Cloudflare Workers static assets via Wrangler. 
 
 ## 2. Deploy
 
+Production: https://sap-learn.pages.dev
+
 1. One time only: `npx wrangler login`
-2. Build and deploy: `npm run deploy`
+2. Set secrets (one time): `npx wrangler pages secret put SESSION_SECRET` and `npx wrangler pages secret put INVITE_CODE`
+3. Build and deploy: `npm run deploy` (runs `wrangler pages deploy`)
 
 Deploy from `main` only.
+
+### Login & progress
+
+- Sign-up needs the invite code (`INVITE_CODE`). Share it only with learners.
+- Each user's progress is stored per user in Cloudflare KV (binding `DATA`) and synced from the browser.
+- Local dev uses `.dev.vars` (`SESSION_SECRET`, `INVITE_CODE=dev-invite`).
+- There is no login rate limiting yet.
+
+### CI/CD
+
+`.github/workflows/ci.yml` runs test + build on PRs and deploys a preview to `<branch>.sap-learn.pages.dev`. A push to `main` deploys production.
+
+One-time setup (repo owner): add repo secrets `CLOUDFLARE_API_TOKEN` (Cloudflare dashboard > My Profile > API Tokens > Create; permission Account > Cloudflare Pages > Edit) and `CLOUDFLARE_ACCOUNT_ID`.
 
 ## 3. Project layout
 
