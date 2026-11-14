@@ -51,33 +51,13 @@
   // Active role: keep S.role if granted, else fall back to the primary role.
   if (!A.admin && A.role && !granted(S.role)) { S.role = A.role; save(); }
 
-  // ---- no role yet: full-page picker
-  function needsPicker() { return !A.admin && !A.role; }
-  function picker() {
+  // ---- no role yet: browse roles, catalog and module previews; everything else waits for the one-time pick.
+  function needsRole() { return !A.admin && !A.role; }
+  if (needsRole() && S.role) { S.role = null; save(); }
+  var pickNote = '<div class="callout"><b>Pilih role dulu</b>Role menentukan modul yang terbuka untukmu. Lihat-lihat role dan preview modul dulu, lalu buka detail role dan klik "Pilih role ini". Pilihan ini sekali saja; mengganti role nanti lewat persetujuan admin.</div>';
+  function gate() {
     var v = q('#view'); if (!v) return;
-    var sel = null;
-    v.innerHTML = '<div class="eyebrow">Langkah pertama</div><h1>Pilih role kamu</h1><p class="lead">Role menentukan modul yang terbuka untukmu. Pilihan ini sekali saja; mengganti role nanti lewat persetujuan admin.</p>' +
-      RGRP.map(function (g) {
-        return '<h2>' + h(g[1]) + '</h2><div class="rolegrid">' + ROLES.filter(function (r) { return r.grp === g[0]; }).map(function (r) {
-          return '<a href="#" class="rolecard" data-r="' + r.id + '"><span class="row"><b>' + h(r.t) + '</b></span><small>' + h(r.d) + '</small><span class="cnt"><span class="pill rel-w">' + r.w.length + ' inti</span><span class="pill rel-g">' + r.g.length + ' general</span><span class="pill rel-p">' + r.p.length + ' pendukung</span></span></a>';
-        }).join('') + '</div>';
-      }).join('') +
-      '<div style="position:sticky;bottom:0;padding:12px 0;background:var(--bg,var(--surface))"><p id="pkMsg" style="color:#b00020;font-size:13px;margin:0 0 6px"></p><button class="btn pri" id="pkGo" disabled style="width:100%">Pilih role dulu</button></div>';
-    var go = q('#pkGo');
-    v.querySelectorAll('[data-r]').forEach(function (a) {
-      a.onclick = function (e) {
-        e.preventDefault(); sel = a.dataset.r;
-        v.querySelectorAll('[data-r]').forEach(function (x) { x.classList.toggle('on', x === a); });
-        go.disabled = false; go.textContent = 'Pilih ' + roleById(sel).t;
-      };
-    });
-    go.onclick = function () {
-      go.disabled = true;
-      post('/api/role', { role: sel }).then(function (x) {
-        if (x[0] || x[1].error === 'Role sudah dipilih') location.reload();
-        else { q('#pkMsg').textContent = x[1].error || 'Gagal'; go.disabled = false; }
-      }).catch(function () { q('#pkMsg').textContent = 'Jaringan bermasalah'; go.disabled = false; });
-    };
+    v.innerHTML = '<h1>Pilih role dulu</h1>' + pickNote + '<div class="row" style="margin-top:14px"><a class="btn pri" href="#role">Lihat semua role</a><a class="btn ghost" href="#modul">Katalog modul</a></div>';
   }
 
   // ---- module lock page
@@ -87,9 +67,11 @@
       if (allowed(id)) return rm.apply(this, arguments);
       var m = MOD[id], v = q('#view'); if (!m || !v) return rm.apply(this, arguments);
       var draw = function () {
-        v.innerHTML = '<header class="pagehero"><div class="eyebrow">' + h(m.code) + ' · Terkunci</div><h1>' + h(m.title) + '</h1><p class="lead">' + m.sum + '</p></header>' +
-          '<div class="callout warn"><b>🔒 Modul ini di luar role kamu.</b>Minta akses ke admin untuk membuka materi dan kuis modul ini. Simulator, studi kasus, dan flashcard tetap terbuka.</div>' +
-          '<div class="row" style="margin-top:14px">' + reqBtn('mod', id, 'Minta akses ke admin') + '<a class="btn ghost" href="#modul">← Katalog modul</a></div>';
+        var bab = (m.lessons || []).map(function (l, i) { return '<li>Bab ' + (i + 1) + '. ' + h(l.t) + '</li>'; }).join('');
+        v.innerHTML = '<header class="pagehero"><div class="eyebrow">' + h(m.code) + (needsRole() ? ' · Preview' : ' · Terkunci') + '</div><h1>' + h(m.title) + '</h1><p class="lead">' + m.sum + '</p></header>' +
+          (needsRole() ? pickNote : '<div class="callout warn"><b>🔒 Modul ini di luar role kamu.</b>Minta akses ke admin untuk membuka materi dan kuis modul ini. Simulator, studi kasus, dan flashcard tetap terbuka.</div>') +
+          (bab ? '<h2>Isi modul</h2><ol class="prose">' + bab + '</ol>' : '') +
+          '<div class="row" style="margin-top:14px">' + (needsRole() ? '<a class="btn pri" href="#role">Pilih role</a>' : reqBtn('mod', id, 'Minta akses ke admin')) + '<a class="btn ghost" href="#modul">← Katalog modul</a></div>';
         bindReq(v, draw);
       };
       draw();
@@ -110,7 +92,10 @@
   // ---- roles pages
   var rr = window.renderRoles;
   if (typeof rr === 'function') {
-    window.renderRoles = function () { rr.apply(this, arguments); var n = q('#noRole'); if (n) n.remove(); };
+    window.renderRoles = function () {
+      rr.apply(this, arguments); var n = q('#noRole'); if (n) n.remove();
+      var v = q('#view'); if (needsRole() && v) v.insertAdjacentHTML('afterbegin', pickNote);
+    };
   } else warn('renderRoles');
 
   var rd = window.renderRoleDetail;
@@ -118,6 +103,19 @@
     window.renderRoleDetail = function (id) {
       rd.apply(this, arguments);
       var b = q('#pickRole'); if (!b || A.admin) return;
+      if (needsRole()) {
+        var r = roleById(id), sure = false, nb = b.cloneNode(false);
+        nb.textContent = 'Pilih role ini'; b.replaceWith(nb);
+        nb.onclick = function () {
+          if (!sure) { sure = true; nb.textContent = 'Yakin pilih ' + r.t + '? Klik lagi (sekali saja)'; return; }
+          nb.disabled = true;
+          post('/api/role', { role: id }).then(function (x) {
+            if (x[0] || x[1].error === 'Role sudah dipilih') { location.hash = 'beranda'; location.reload(); }
+            else { nb.textContent = x[1].error || 'Gagal, coba lagi'; nb.disabled = false; sure = false; }
+          }).catch(function () { nb.textContent = 'Jaringan bermasalah'; nb.disabled = false; sure = false; });
+        };
+        return;
+      }
       if (granted(id)) { b.textContent = 'Jadikan jalur aktif'; return; }
       var again = function () { window.renderRoleDetail(id); };
       var box = document.createElement('span');
@@ -157,13 +155,14 @@
     };
   } else warn('renderHome');
 
-  // ---- boot: re-render with hooks in place; keep the picker in front while no role is set.
-  if (typeof route === 'function') {
-    route();
-    if (needsPicker()) {
-      picker();
-      // app.js's hashchange listener holds the original route(); ours runs after it.
-      window.addEventListener('hashchange', picker);
-    }
-  } else warn('route');
+  // ---- gate the rest until a role is picked (home lands on the role list)
+  if (needsRole()) {
+    window.renderHome = function () { window.renderRoles(); };
+    ['renderSimHome', 'renderQuizHome', 'renderCards', 'renderCaseHome', 'renderReport', 'renderPath'].forEach(function (n) {
+      if (typeof window[n] === 'function') window[n] = gate; else warn(n);
+    });
+  }
+
+  // ---- boot: re-render with hooks in place.
+  if (typeof route === 'function') route(); else warn('route');
 })();

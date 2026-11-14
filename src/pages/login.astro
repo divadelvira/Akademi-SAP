@@ -1,7 +1,5 @@
 ---
 import '../styles/app.css';
-import { RGRP, ROLES } from '../../functions/_lib/catalog.js';
-const roleDesc = Object.fromEntries(ROLES.map((r) => [r.id, r.d]));
 ---
 <!doctype html>
 <html lang="id">
@@ -12,6 +10,7 @@ const roleDesc = Object.fromEntries(ROLES.map((r) => [r.id, r.d]));
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@350;400;500;700&display=swap" rel="stylesheet">
+<style is:inline>[hidden]{display:none!important}</style>
 </head>
 <body>
 <main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px">
@@ -25,23 +24,12 @@ const roleDesc = Object.fromEntries(ROLES.map((r) => [r.id, r.d]));
       <label>Username<input id="u" name="username" autocomplete="username" required minlength="3" maxlength="32" autocapitalize="none"></label>
       <label>Password<input id="p" name="password" type="password" autocomplete="current-password" required minlength="8"></label>
       <label id="invl" hidden>Kode undangan<input id="inv" name="invite" autocomplete="off"></label>
-      <label id="rolel" hidden>Role
-        <select id="role" name="role" required>
-          <option value="">Pilih role…</option>
-          {RGRP.map(([g, label]) => (
-            <optgroup label={label}>
-              {ROLES.filter((r) => r.grp === g).map((r) => <option value={r.id}>{r.t}</option>)}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-      <p id="roled" style="margin:0;font-size:13px;color:var(--meta)" hidden></p>
     </div>
     <p id="msg" role="alert" aria-live="polite" style="color:#b00020;font-size:13px;min-height:1.3em;margin:10px 0"></p>
     <button id="go" class="btn" type="submit" style="width:100%">Masuk</button>
   </form>
 </main>
-<script is:inline define:vars={{ roleDesc }}>
+<script is:inline>
   var mode = 'login', f = document.getElementById('f'), msg = document.getElementById('msg'), go = document.getElementById('go');
   document.querySelectorAll('[data-mode]').forEach(function (t) {
     t.onclick = function () {
@@ -50,28 +38,16 @@ const roleDesc = Object.fromEntries(ROLES.map((r) => [r.id, r.d]));
         var on = x === t; x.classList.toggle('on', on); x.setAttribute('aria-selected', on);
       });
       document.getElementById('invl').hidden = mode !== 'register';
-      document.getElementById('rolel').hidden = mode !== 'register';
-      showDesc();
       document.getElementById('p').autocomplete = mode === 'register' ? 'new-password' : 'current-password';
       go.textContent = t.textContent; msg.textContent = '';
     };
   });
-  var roleSel = document.getElementById('role'), roled = document.getElementById('roled');
-  function showDesc() {
-    var d = mode === 'register' && roleDesc[roleSel.value];
-    roled.hidden = !d; roled.textContent = d || '';
-  }
-  roleSel.onchange = showDesc;
   var invite = new URLSearchParams(location.search).get('invite');
   if (invite) { f.invite.value = invite; document.querySelector('[data-mode="register"]').click(); }
   f.onsubmit = function (e) {
     e.preventDefault();
     var body = { username: f.username.value.trim(), password: f.password.value };
-    if (mode === 'register') {
-      body.invite = f.invite.value.trim();
-      body.role = roleSel.value;
-      if (!body.role) { msg.textContent = 'Pilih role dulu'; return; }
-    }
+    if (mode === 'register') body.invite = f.invite.value.trim();
     go.disabled = true; msg.textContent = '';
     fetch('/api/' + mode, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return [r.ok, d]; }); })

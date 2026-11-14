@@ -22,15 +22,13 @@ const prog = async (e, user) => (await call(progress.onRequestGet, e, user)).jso
 const ask = async (e, type, target, user = "ani") => (await (await call(requests.onRequestPost, e, user, { type, target })).json()).request;
 const decide = (e, id, action) => call(adminReq.onRequestPost, e, "diva", { action }, { id });
 
-test("register needs a known role", async () => {
+test("register leaves role empty; user picks it once after login", async () => {
   const e = await env();
   await e.DATA.put("invite:abcdef", JSON.stringify({ expires: Date.now() + 1e5 }));
-  for (const role of [undefined, "nope"]) {
-    const r = await call(register.onRequestPost, e, null, { username: "budi", password: "password1", invite: "abcdef", role });
-    assert.equal(r.status, 400);
-  }
   const ok = await call(register.onRequestPost, e, null, { username: "budi", password: "password1", invite: "abcdef", role: "inv" });
   assert.equal(ok.status, 200);
+  assert.equal((await prog(e, "budi")).role ?? null, null);
+  assert.equal((await call(role.onRequestPost, e, "budi", { role: "inv" })).status, 200);
   assert.equal((await prog(e, "budi")).role, "inv");
 });
 
