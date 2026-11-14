@@ -41,6 +41,8 @@ import '../styles/app.css';
       go.textContent = t.textContent; msg.textContent = '';
     };
   });
+  var invite = new URLSearchParams(location.search).get('invite');
+  if (invite) { f.invite.value = invite; document.querySelector('[data-mode="register"]').click(); }
   f.onsubmit = function (e) {
     e.preventDefault();
     var body = { username: f.username.value.trim(), password: f.password.value };

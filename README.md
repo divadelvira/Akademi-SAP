@@ -6,30 +6,31 @@ Static Astro 7 site, deployed to Cloudflare Pages (Pages Functions handle login 
 
 1. Install dependencies: `npm install`
 2. Start the dev server: `npm run dev`
-3. Test the production build locally: `npm run preview` (builds `dist/`, then runs `wrangler dev`)
+3. Test the production build locally: `npm run preview` (builds `dist/`, then runs `wrangler pages dev`)
 
 ## 2. Deploy
 
 Production: https://sap-learn.pages.dev
 
 1. One time only: `npx wrangler login`
-2. Set secrets (one time): `npx wrangler pages secret put SESSION_SECRET` and `npx wrangler pages secret put INVITE_CODE`
+2. Set the secret (one time): `npx wrangler pages secret put SESSION_SECRET`
 3. Deploys happen automatically on push to `main` (see CI/CD). `npm run deploy` is only a manual fallback.
 
 Deploy from `main` only.
 
 ### Login & progress
 
-- Sign-up needs the invite code (`INVITE_CODE`). Share it only with learners.
+- Sign-up needs an invite code. An admin creates one at `/admin` ("Buat kode baru"); each code works for one sign-up and expires after 30 minutes. The admin sends the learner the link `/login?invite=<code>`.
+- Admins are users whose KV record `user:<name>` has `"admin": true`. Make one by setting that field on the record (`npx wrangler kv key get/put --remote`).
 - Each user's progress is stored per user in Cloudflare KV (binding `DATA`) and synced from the browser.
-- Local dev uses `.dev.vars` (`SESSION_SECRET`, `INVITE_CODE=dev-invite`).
+- Local dev uses `.dev.vars` (`SESSION_SECRET`). Create a local admin with `wrangler kv key put user:<name> --local`.
 - There is no login rate limiting yet.
 
 ### CI/CD
 
 - **Deploy:** Cloudflare Pages is connected to this GitHub repo. A push to `main` builds (`npm run build`, output `dist`) and deploys production; every PR gets a preview URL posted by Cloudflare.
 - **Checks:** `.github/workflows/ci.yml` runs `npm test` + `npm run build` on PRs and on `main`. No Cloudflare token is needed in GitHub.
-- Build uses Node 24 (`.node-version`). KV binding comes from `wrangler.jsonc`; secrets `SESSION_SECRET` and `INVITE_CODE` live in the Pages project settings.
+- Build uses Node 24 (`.node-version`). KV binding comes from `wrangler.jsonc`; secret `SESSION_SECRET` lives in the Pages project settings.
 
 ## 3. Project layout
 
