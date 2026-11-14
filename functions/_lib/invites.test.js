@@ -2,19 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as invites from "../api/invites.js";
 import * as register from "../api/register.js";
+import { kv } from "./testkv.js";
 
-function kv() {
-  const m = new Map();
-  return {
-    async get(k, type) { const e = m.get(k); return e === undefined ? null : type === "json" ? JSON.parse(e.v) : e.v; },
-    async put(k, v, o = {}) { m.set(k, { v, metadata: o.metadata }); },
-    async delete(k) { m.delete(k); },
-    async list({ prefix }) { return { keys: [...m].filter(([k]) => k.startsWith(prefix)).map(([name, e]) => ({ name, metadata: e.metadata })) }; },
-  };
-}
 const env = () => ({ DATA: kv(), SESSION_SECRET: "s" });
 const signup = (e, username, invite) =>
-  register.onRequestPost({ env: e, request: new Request("http://x/api/register", { method: "POST", body: JSON.stringify({ username, password: "password1", invite }) }) });
+  register.onRequestPost({ env: e, request: new Request("http://x/api/register", { method: "POST", body: JSON.stringify({ username, password: "password1", invite, role: "wh" }) }) });
 
 test("only admins can create or list invites", async () => {
   const e = env();

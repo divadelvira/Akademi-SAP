@@ -1,5 +1,6 @@
 ---
 import '../styles/app.css';
+import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
 ---
 <!doctype html>
 <html lang="id">
@@ -10,14 +11,27 @@ import '../styles/app.css';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@350;400;500;700&display=swap" rel="stylesheet">
+<style is:global>
+  .arow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .arow .grow{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
+  .arow .sub{font-size:12px;opacity:.7}
+  .abadge{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:1px 8px;margin-left:6px}
+  .aedit{padding:12px;border:1px solid var(--line);border-radius:10px;margin:8px 0}
+  .aedit fieldset{border:0;margin:10px 0;padding:0;min-width:0}
+  .aedit legend{font-weight:700;font-size:13px;margin-bottom:4px;padding:0}
+  .aedit label{display:block;font-size:13px;padding:3px 0;overflow-wrap:anywhere}
+  .aedit select{max-width:100%}
+  .aedit .grp{font-size:12px;opacity:.7;margin:8px 0 2px}
+</style>
 </head>
 <body>
-<main style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px">
-  <section class="card" style="width:100%;max-width:460px">
-    <a href="/" style="font-size:13px">← Kembali ke aplikasi</a>
+<script is:inline type="application/json" id="catalog" set:html={JSON.stringify({ RGRP, ROLES, MODS, CATS })}></script>
+<main style="min-height:100vh;display:flex;flex-direction:column;gap:16px;align-items:center;padding:32px 16px">
+  <a href="/" style="font-size:13px;width:100%;max-width:760px">← Kembali ke aplikasi</a>
+  <div id="denied" hidden><p>Halaman ini khusus admin.</p></div>
+  <section class="card" style="width:100%;max-width:760px;box-sizing:border-box">
     <h1 style="font-size:20px;margin:8px 0 4px">Kode undangan</h1>
     <p style="font-size:13px;margin:0 0 14px;opacity:.75">Setiap kode hanya bisa dipakai 1 orang dan hangus setelah 30 menit.</p>
-    <div id="denied" hidden><p>Halaman ini khusus admin.</p></div>
     <div id="panel" hidden>
       <button id="gen" class="btn" type="button" style="width:100%">Buat kode baru</button>
       <div id="out" hidden style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px">
@@ -32,6 +46,14 @@ import '../styles/app.css';
       <ul id="list" style="list-style:none;padding:0;margin:0;font-size:13px"></ul>
     </div>
     <p id="msg" role="alert" aria-live="polite" style="color:#b00020;font-size:13px;min-height:1.3em;margin:10px 0 0"></p>
+  </section>
+  <section id="reqCard" class="card" hidden style="width:100%;max-width:760px;box-sizing:border-box">
+    <h2 style="font-size:18px;margin:0 0 10px">Permintaan akses</h2>
+    <div id="reqs"></div>
+  </section>
+  <section id="usrCard" class="card" hidden style="width:100%;max-width:760px;box-sizing:border-box">
+    <h2 style="font-size:18px;margin:0 0 10px">Pengguna</h2>
+    <div id="usrs"></div>
   </section>
 </main>
 <script is:inline>
@@ -74,6 +96,142 @@ import '../styles/app.css';
     navigator.clipboard.writeText($('link').value).then(function () { $('copy').textContent = 'Tersalin ✓'; }, function () { $('link').focus(); });
   };
   load();
+
+  /* ---- role access ---- */
+  var CAT = JSON.parse($('catalog').textContent);
+  var roleById = {}, modById = {};
+  CAT.ROLES.forEach(function (r) { roleById[r.id] = r; });
+  CAT.MODS.forEach(function (m) { modById[m.id] = m; });
+  var TYPE = { mod: 'Tambah modul', role: 'Role tambahan', 'switch': 'Ganti role' };
+  var el = function (tag, text, css) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (css) e.style.cssText = css; return e; };
+  var cls = function (e, c) { e.className = c; return e; };
+  var modLabel = function (id) { var m = modById[id]; return m ? m.code + ' · ' + m.title : id; };
+  var targetName = function (r) { return r.type === 'mod' ? modLabel(r.target) : (roleById[r.target] ? roleById[r.target].t : r.target); };
+  function adm(method, url, body) {
+    var init = { method: method, credentials: 'same-origin', headers: { 'content-type': 'application/json' } };
+    if (body) init.body = JSON.stringify(body);
+    return fetch(url, init).then(function (r) {
+      if (r.status === 401) { location.href = '/login'; throw 0; }
+      if (r.status === 403) { $('denied').hidden = false; $('panel').hidden = true; $('reqCard').hidden = true; $('usrCard').hidden = true; throw 0; }
+      if (!r.ok) throw new Error();
+      return r.json();
+    });
+  }
+  function reload() {
+    return adm('GET', '/api/admin/users').then(function (d) {
+      $('reqCard').hidden = false; $('usrCard').hidden = false;
+      renderReqs(d.requests); renderUsers(d.users);
+    }).catch(fail);
+  }
+  function renderReqs(reqs) {
+    var box = $('reqs'); box.textContent = '';
+    if (!reqs.length) { box.append(el('p', 'Tidak ada permintaan.', 'font-size:13px;opacity:.6;margin:0')); return; }
+    reqs.forEach(function (r) {
+      var row = cls(el('div'), 'arow');
+      var info = cls(el('div'), 'grow');
+      info.append(el('strong', r.user), el('div', (TYPE[r.type] || r.type) + ': ' + targetName(r)),
+        cls(el('div', new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })), 'sub'));
+      var act = function (label, action) {
+        var b = cls(el('button', label), 'btn'); b.type = 'button';
+        b.onclick = function () {
+          $('msg').textContent = ''; row.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+          adm('POST', '/api/admin/requests/' + encodeURIComponent(r.id), { action: action }).catch(fail).then(reload);
+        };
+        return b;
+      };
+      row.append(info, act('Setujui', 'approve'), act('Tolak', 'reject'));
+      box.append(row);
+    });
+  }
+  function renderUsers(users) {
+    var box = $('usrs'); box.textContent = '';
+    users.forEach(function (u) {
+      var wrap = el('div');
+      var row = cls(el('div'), 'arow'); row.style.cursor = 'pointer';
+      var info = cls(el('div'), 'grow');
+      var nm = el('strong', u.name);
+      if (u.admin) nm.append(cls(el('span', 'admin'), 'abadge'));
+      var counts = [];
+      if ((u.roles || []).length) counts.push('+' + u.roles.length + ' role');
+      if ((u.mods || []).length) counts.push('+' + u.mods.length + ' modul');
+      info.append(nm, cls(el('div', (u.role && roleById[u.role] ? roleById[u.role].t : 'Belum pilih role') + (counts.length ? ' · ' + counts.join(' · ') : '')), 'sub'));
+      var open = cls(el('button', 'Atur'), 'btn'); open.type = 'button';
+      row.append(info, open);
+      var ed = null;
+      row.onclick = function () {
+        if (ed) { ed.remove(); ed = null; return; }
+        ed = editor(u); wrap.append(ed);
+      };
+      wrap.append(row); box.append(wrap);
+    });
+  }
+  function editor(u) {
+    var d = cls(el('div'), 'aedit');
+    if (u.admin) { d.append(el('p', 'Admin: akses semua modul', 'margin:0;font-size:13px')); return d; }
+    var sel = el('select'); sel.append(new Option('Belum pilih role', ''));
+    var f1 = el('fieldset'); f1.append(el('legend', 'Role utama'), sel);
+    var f2 = el('fieldset'); f2.append(el('legend', 'Role tambahan'));
+    var f3 = el('fieldset'); f3.append(el('legend', 'Modul tambahan'));
+    var roleBoxes = {}, modBoxes = {}, hints = {}, own = {};
+    CAT.RGRP.forEach(function (g) {
+      var rs = CAT.ROLES.filter(function (r) { return r.grp === g[0]; });
+      if (!rs.length) return;
+      var og = document.createElement('optgroup'); og.label = g[1];
+      rs.forEach(function (r) { og.append(new Option(r.t, r.id)); });
+      sel.append(og);
+      f2.append(cls(el('div', g[1]), 'grp'));
+      rs.forEach(function (r) {
+        var l = el('label'), c = document.createElement('input'); c.type = 'checkbox'; c.value = r.id;
+        c.checked = (u.roles || []).indexOf(r.id) >= 0; c.onchange = sync;
+        roleBoxes[r.id] = c; l.append(c, ' ' + r.t); f2.append(l);
+      });
+    });
+    sel.value = u.role || '';
+    CAT.CATS.forEach(function (ct) {
+      var ms = CAT.MODS.filter(function (m) { return m.cat === ct.id; });
+      if (!ms.length) return;
+      f3.append(cls(el('div', ct.t), 'grp'));
+      ms.forEach(function (m) {
+        var l = el('label'), c = document.createElement('input'); c.type = 'checkbox'; c.value = m.id;
+        c.checked = own[m.id] = (u.mods || []).indexOf(m.id) >= 0; c.onchange = sync;
+        var hint = el('span', ' · dari role', 'font-size:12px;opacity:.7'); hint.hidden = true;
+        modBoxes[m.id] = c; hints[m.id] = hint; l.append(c, ' ' + m.code + ' · ' + m.title, hint); f3.append(l);
+      });
+    });
+    function sync() {
+      var primary = sel.value, covered = {};
+      Object.keys(roleBoxes).forEach(function (id) {
+        roleBoxes[id].disabled = id === primary;
+        if (id === primary) roleBoxes[id].checked = false;
+      });
+      // remember the user's own choice for modules not currently covered by a role
+      Object.keys(modBoxes).forEach(function (id) { if (!modBoxes[id].disabled) own[id] = modBoxes[id].checked; });
+      [primary].concat(Object.keys(roleBoxes).filter(function (id) { return roleBoxes[id].checked; })).forEach(function (id) {
+        var r = roleById[id]; if (r) [].concat(r.w, r.g, r.p).forEach(function (m) { covered[m] = 1; });
+      });
+      Object.keys(modBoxes).forEach(function (id) {
+        modBoxes[id].disabled = !!covered[id]; hints[id].hidden = !covered[id];
+        modBoxes[id].checked = covered[id] ? true : own[id];
+      });
+    }
+    sel.onchange = sync; sync();
+    var save = cls(el('button', 'Simpan'), 'btn'); save.type = 'button';
+    var st = el('span', '', 'font-size:12px;margin-left:8px');
+    save.onclick = function () {
+      var body = {
+        role: sel.value || null,
+        roles: Object.keys(roleBoxes).filter(function (id) { return roleBoxes[id].checked; }),
+        mods: Object.keys(modBoxes).filter(function (id) { return !modBoxes[id].disabled && modBoxes[id].checked; })
+      };
+      save.disabled = true; st.textContent = ''; $('msg').textContent = '';
+      adm('PUT', '/api/admin/users/' + encodeURIComponent(u.name), body).then(function () {
+        st.textContent = 'Tersimpan ✓'; return reload();
+      }).catch(function (e) { fail(e); save.disabled = false; });
+    };
+    d.append(f1, f2, f3, save, st);
+    return d;
+  }
+  reload();
 </script>
 </body>
 </html>

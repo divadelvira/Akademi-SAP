@@ -23,6 +23,15 @@ Deploy from `main` only.
 - Sign-up needs an invite code. An admin creates one at `/admin` ("Buat kode baru"); each code works for one sign-up and expires after 30 minutes. The admin sends the learner the link `/login?invite=<code>`.
 - Admins are users whose KV record `user:<name>` has `"admin": true`. Make one by setting that field on the record (`npx wrangler kv key get/put --remote`).
 - Each user's progress is stored per user in Cloudflare KV (binding `DATA`) and synced from the browser.
+
+### Roles & access
+
+- Learners pick a role when signing up. Users without a role (older accounts) pick one once, on their next login.
+- The role's modules are open: wajib, general and pendukung. Every other module shows as locked (🔒), with a "Minta akses" button. The home page also suggests add-on modules from similar roles.
+- Learners can request three things: one extra module, a second role, or a role change. An admin approves or rejects each request at `/admin` ("Permintaan akses"). The admin can also edit any user's role, extra roles and extra modules directly ("Pengguna"). Admins can open every module.
+- Locking covers each module's lessons and quiz. The simulator, studi kasus and flashcards stay open for everyone.
+- The lock is UI-only: `public/access.js` wraps functions of the generated `app.js`. If the artifact renames those functions, `npm run sync` fails and names the missing hook.
+- Role and module lists for the server and admin page come from `functions/_lib/catalog.js`, which `npm run sync` generates.
 - Local dev uses `.dev.vars` (`SESSION_SECRET`). Create a local admin with `wrangler kv key put user:<name> --local`.
 - There is no login rate limiting yet.
 
@@ -39,6 +48,7 @@ Generated from the artifact by `npm run sync`. **Do not hand-edit these files.**
 - `src/styles/app.css`: styles
 - `src/shell.html`: page shell (markup inside `<body>`)
 - `public/app.js`: client script
+- `functions/_lib/catalog.js`: roles and module ids
 
 `src/pages/index.astro` (head, fonts, loads the shell and script) and everything else (config, scripts, other pages) is hand-maintained.
 

@@ -56,9 +56,15 @@
       if (v !== null) navigator.sendBeacon('/api/progress', new Blob([v], { type: 'text/plain' }));
     });
     widget(d.user, d.admin);
-    // app.js reads localStorage synchronously at its top, so it loads last.
+    window.__access = { admin: !!d.admin, role: d.role || null, roles: d.roles || [], mods: d.mods || [], requests: d.requests || [] };
+    // app.js reads localStorage synchronously at its top, so it loads last; access.js wraps its renderers after.
     var s = document.createElement('script');
     s.src = '/app.js';
+    s.onload = function () {
+      var a = document.createElement('script');
+      a.src = '/access.js';
+      document.body.appendChild(a);
+    };
     document.body.appendChild(s);
   }).catch(login);
 })();

@@ -12,7 +12,7 @@ const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(M
 const cp=(q,o,a,e)=>({q,o,a,e});
 
 /* ===================== MODULES (lessons + checkpoints) ===================== */
-const MODULES=[
+const LEGACY_MODS=[
 {id:1,title:'Navigasi SAP GUI',dur:'25 mnt',sum:'Login, layar SAP, status bar, command field, tombol fungsi, multiple selection, variant, dan export.',tcs:['/n','/o','F4','F8'],
 note:'Tulis dengan kata-katamu: kapan kamu memakai /n dan kapan /o? Variant apa yang akan kamu buat untuk laporan mingguanmu?',
 objs:['Login ke sistem yang benar (client, user, bahasa)','Mengenali bagian layar SAP dan membaca status bar','Pindah transaksi dengan /n dan /o','Memakai F4, F8, F3, Ctrl+S, multiple selection, dan variant'],
@@ -589,6 +589,835 @@ steps:[
 {q:'Siapa yang bisa mengubah toleransi atau qty PO?',o:[['Procurement melalui ME22N',1,'Bukan gudang atau admin.'],['Gudang',0,'Tidak berwenang.'],['Vendor',0,'Tidak punya akses.']]}
 ]}
 );
+
+/* ===================== KATALOG MODUL: builder ===================== */
+const tcCell=c=>/\s/.test(c)?`<b>${c}</b>`:tc(c);
+function L(t,o){
+  let h='';
+  (o.p||[]).forEach(x=>h+=`<p>${x}</p>`);
+  if(o.flow) h+=`<div class="pflow" role="list" aria-label="Alur proses">${o.flow.map((s,i)=>`<div class="pf" role="listitem"><span class="pf-n">${i+1}</span><b>${s[0]}</b>${s[1]?`<small>${s[1]}</small>`:''}</div>`).join('')}</div>`;
+  if(o.tc) h+=`<div class="tbl-wrap"><table><tr><th style="width:34%">T-code / app</th><th>Fungsi</th></tr>${o.tc.map(r=>`<tr><td>${r[0].split(' / ').map(tcCell).join(' ')}</td><td>${r[1]}</td></tr>`).join('')}</table></div>`;
+  if(o.integ) h+=`<div class="callout"><b>Integrasi</b>${o.integ}</div>`;
+  if(o.tip) h+=`<div class="callout warn"><b>Di lapangan</b>${o.tip}</div>`;
+  return {t,html:h,keys:o.keys,cp:cp(...o.cp),tcRows:o.tc||[]};
+}
+const QZ=a=>a.map(x=>cp(...x));
+
+/* ===================== FINANCE ===================== */
+const MODS_FIN=[
+{id:'fi-gl',code:'FI-GL',cat:'fin',title:'FI – General Ledger & Laporan Keuangan',dur:'35 mnt',
+sum:'Company code, akun G/L, dokumen jurnal, tutup buku, dan laporan neraca serta laba rugi.',tcs:['FS00','FB50','FB03','FAGLL03','F.01'],
+objs:['Memahami struktur FI: company code, chart of accounts, tahun fiskal, periode','Membaca dan memposting dokumen jurnal (header, line item, posting key)','Menjalankan langkah tutup buku bulanan','Menarik neraca, laba rugi, dan trial balance'],
+note:'Tulis tiga langkah tutup buku yang paling sering terlambat di timmu, dan siapa pemiliknya.',
+lessons:[
+L('Struktur FI dan dokumen akuntansi',{p:['FI mencatat semua transaksi keuangan per <b>company code</b> (satu badan hukum). Akun G/L diambil dari <b>chart of accounts</b>, dan setiap posting masuk ke <b>periode</b> dalam tahun fiskal. Di S/4HANA, semua posting FI dan CO tersimpan di satu tabel, <b>Universal Journal (ACDOCA)</b>, sehingga angka FI dan CO selalu sama.','Setiap dokumen punya <b>header</b> (tanggal dokumen, tanggal posting, document type, referensi) dan <b>line item</b> (akun, debit/kredit lewat posting key, jumlah, objek biaya). Document type menandai sumbernya: SA jurnal umum, KR invoice vendor, KZ pembayaran vendor, DR invoice customer, DZ penerimaan customer, AA transaksi aset, WE goods receipt.'],
+tc:[['FS00','Membuat/menampilkan master akun G/L di level chart of accounts dan company code'],['FB03','Menampilkan dokumen akuntansi'],['FAGLL03 / FAGLL03H','Line item akun G/L (open item, cleared item, semua item)'],['FAGLB03','Saldo akun per periode'],['Manage Journal Entries','App Fiori untuk mencari, menampilkan, dan me-reverse jurnal']],
+keys:['Company code = entitas hukum; semua posting FI ada di dalamnya','Dokumen = header + line item; total debit harus sama dengan kredit','Document type menunjukkan asal posting (SA, KR, DR, WE, AA)'],
+cp:['Kamu melihat dokumen dengan document type KR. Kemungkinan besar dokumen ini berasal dari…',['Invoice vendor','Penerimaan uang dari customer','Penyusutan aset','Goods issue ke cost center'],0,'KR = vendor invoice. Pembayaran vendor memakai KZ, customer invoice DR.']}),
+L('Posting jurnal dan tutup buku bulanan',{p:['Jurnal manual dibuat dengan <b>FB50</b> (atau app Post General Journal Entries). Biasakan <b>Simulate</b> sebelum Post untuk melihat akun lawan, pajak, dan objek CO yang terisi. Jurnal yang salah tidak dihapus, melainkan <b>di-reverse</b> dengan FB08 lalu diposting ulang, supaya jejak audit tetap ada.','Tutup buku adalah rangkaian langkah dengan urutan tetap. Langkah yang tertunda di satu tim (misalnya GR yang belum diposting gudang) akan membuat angka akhir bulan salah.'],
+flow:[['Cut-off transaksi','GR, GI, invoice diposting'],['Accrual','FBS1, reverse otomatis F.81'],['Penyusutan','AFAB dari tim aset'],['Revaluasi valas','FAGL_FCV'],['Regroup GR/IR','F.19 / FAGL_FCV'],['Settlement CO','KO88, CJ88'],['Tutup periode','OB52 / Manage Posting Periods']],
+tc:[['FB50','Posting jurnal G/L'],['FB08','Reverse dokumen'],['FBS1 / F.81','Accrual dan pembalikannya di awal periode berikutnya'],['FAGL_FCV','Revaluasi saldo valuta asing'],['OB52','Buka/tutup periode posting (biasanya hanya tim GL lead)']],
+integ:'Sebagian besar jurnal tidak dibuat oleh tim GL. GR (MIGO) mendebit persediaan dan mengkredit GR/IR, MIRO mengkredit vendor, billing SD mendebit piutang, payroll memposting beban gaji, dan AFAB memposting penyusutan.',
+keys:['Simulate sebelum Post','Koreksi dengan reverse (FB08), bukan hapus','Tutup buku berurutan: cut-off → accrual → depresiasi → revaluasi → settlement → tutup periode'],
+cp:['Jurnal biaya listrik Rp 12 jt terposting ke akun yang salah dan periodenya masih terbuka. Langkah yang benar?',['Ubah nomor akun langsung di FB02','Reverse dengan FB08, lalu posting ulang dengan akun benar','Hapus dokumen','Biarkan dan koreksi tahun depan'],1,'Akun dan jumlah tidak bisa diubah di FB02. Reverse lalu posting ulang menjaga jejak audit.']}),
+L('Laporan keuangan',{p:['Neraca dan laba rugi disusun dari saldo G/L menurut <b>Financial Statement Version (FSV)</b>, yaitu susunan baris laporan (aset lancar, liabilitas, pendapatan, HPP, dan seterusnya). Satu chart of accounts bisa punya beberapa FSV, misalnya untuk manajemen dan untuk pajak.','<b>Trial balance</b> dipakai untuk memastikan semua akun seimbang sebelum laporan final. Selisih biasanya ditelusuri dengan line item (FAGLL03) sampai ke dokumen sumbernya di MM, SD, atau aset.'],
+tc:[['F.01 / S_ALR_87012284','Neraca dan laba rugi berdasarkan FSV'],['S_ALR_87012277','Saldo akun G/L (trial balance)'],['Trial Balance','App Fiori trial balance dengan drill-down'],['Display Financial Statement','App Fiori laporan keuangan']],
+tip:'Sebelum mengirim laporan, bandingkan saldo GR/IR, persediaan, dan aset dengan laporan sub-ledger (MB5L untuk persediaan, AR01 untuk aset). Kalau beda, ada posting yang belum lengkap.',
+keys:['FSV menentukan susunan baris neraca/laba rugi','Trial balance dulu, laporan final kemudian','Selisih ditelusuri lewat line item sampai dokumen sumber'],
+cp:['Saldo persediaan di neraca berbeda dari total nilai stok di laporan MM. Langkah pertama yang masuk akal?',['Posting jurnal penyesuaian sebesar selisih','Bandingkan line item akun persediaan dengan laporan sub-ledger dan cari dokumen yang tidak cocok','Ubah FSV','Abaikan karena wajar'],1,'Telusuri dulu penyebabnya. Jurnal penyesuaian tanpa investigasi menutupi masalah.']})
+],
+quiz:QZ([
+['Tabel tunggal yang menyimpan posting FI dan CO di S/4HANA adalah…',['BKPF','ACDOCA','EKKO','MARA'],1,'ACDOCA = Universal Journal.'],
+['T-code untuk memposting jurnal G/L manual?',['FB60','FB50','F-28','FS00'],1,'FB50 = enter G/L account document.'],
+['Mengapa dokumen salah di-reverse, bukan dihapus?',['SAP tidak punya tombol hapus untuk dokumen terposting dan jejak audit harus tetap ada','Agar lebih cepat','Karena periode tertutup','Supaya nomor dokumen hilang'],0,'Dokumen terposting bersifat permanen; koreksi lewat dokumen pembalik.'],
+['Accrual akhir bulan biasanya dibalik otomatis di awal bulan berikutnya dengan…',['F.81','F110','MIRO','KO88'],0,'FBS1 membuat accrual, F.81 membalikkannya.'],
+['Apa fungsi Financial Statement Version?',['Mengatur susunan baris neraca dan laba rugi','Membuka periode','Membuat akun G/L','Mengatur hak akses'],0,'FSV = struktur laporan keuangan.']
+])},
+
+{id:'fi-ap',code:'FI-AP',cat:'fin',title:'FI – Accounts Payable (Hutang)',dur:'30 mnt',
+sum:'Master vendor, invoice dengan dan tanpa PO, pembayaran otomatis F110, dan monitoring hutang.',tcs:['BP','FB60','MIRO','F110','FBL1N'],
+objs:['Memahami data vendor (business partner) yang dipakai AP','Memposting invoice dengan PO (MIRO) dan tanpa PO (FB60)','Menjalankan pembayaran manual dan otomatis','Memantau dan menganalisis hutang vendor'],
+note:'Catat langkah yang kamu lakukan saat vendor bertanya "invoice kami kapan dibayar?".',
+lessons:[
+L('Master vendor dan akun rekonsiliasi',{p:['Di S/4HANA, vendor dibuat sebagai <b>Business Partner (BP)</b> dengan role FI vendor (FLVN00) dan purchasing (FLVN01). Di ECC dipakai XK01/FK01. Data penting untuk AP: <b>reconciliation account</b> (akun hutang di G/L), <b>payment terms</b> (misalnya 30 hari), <b>payment methods</b>, data bank, dan NPWP.','Hutang tidak diposting langsung ke akun G/L hutang. Posting masuk ke akun vendor (sub-ledger), lalu SAP otomatis meneruskannya ke reconciliation account. Itulah sebabnya akun hutang di G/L selalu sama dengan total saldo vendor.'],
+tc:[['BP','Membuat/mengubah business partner vendor (S/4HANA)'],['XK03 / FK03','Menampilkan vendor (ECC)'],['FK10N','Saldo vendor per periode'],['Manage Supplier Master Data','App Fiori data vendor']],
+tip:'Perubahan rekening bank vendor adalah titik rawan fraud. Banyak perusahaan mewajibkan dual control (orang kedua mengonfirmasi perubahan, misalnya dengan FK08 di ECC).',
+keys:['Vendor = BP dengan role FLVN00/FLVN01','Reconciliation account menghubungkan sub-ledger vendor ke G/L','Payment terms menentukan tanggal jatuh tempo'],
+cp:['Total saldo semua vendor Rp 4,2 M. Berapa saldo akun G/L hutang dagang (reconciliation account) jika tidak ada posting lain ke akun itu?',['Bisa berbeda jauh','Rp 4,2 M, karena posting vendor otomatis masuk ke reconciliation account','Nol','Tergantung FSV'],1,'Reconciliation account tidak bisa diposting langsung, sehingga selalu sama dengan sub-ledger.']}),
+L('Invoice vendor: dengan PO dan tanpa PO',{p:['Invoice untuk barang/jasa yang ada PO-nya diposting di <b>MIRO</b> (Logistics Invoice Verification). SAP mencocokkan PO, GR, dan invoice (3-way match). Jika qty atau harga di luar toleransi, invoice tersimpan tapi <b>blocked for payment</b> dan baru bisa dibayar setelah dirilis (MRBR) atau dikoreksi.','Invoice tanpa PO, misalnya listrik, sewa, atau jasa profesional, diposting di <b>FB60</b> langsung ke akun biaya dan objek CO (cost center/WBS). Jika data belum lengkap, simpan sebagai <b>park</b> (FV60) agar bisa dicek atasan sebelum diposting.'],
+flow:[['Invoice diterima','cek PO / tanpa PO'],['MIRO atau FB60','isi tanggal, jumlah, pajak'],['Simulate','cek akun & objek biaya'],['Post / Park','nomor dokumen'],['Blocked?','MRBR untuk rilis']],
+tc:[['MIRO','Invoice dengan referensi PO (3-way match)'],['FB60','Invoice vendor tanpa PO'],['FB65','Credit memo vendor'],['FV60','Park invoice untuk direview'],['MRBR','Rilis invoice yang blocked']],
+integ:'MIRO memakai data PO (MM) dan GR (MIGO). Invoice blocked hampir selalu berarti GR belum lengkap atau harga PO berbeda, jadi solusinya ada di tim pembelian/gudang.',
+keys:['Ada PO → MIRO; tanpa PO → FB60','Blocked for payment = 3-way match gagal','Park (FV60) untuk invoice yang perlu direview'],
+cp:['Tagihan sewa gudang bulanan (tidak ada PO) masuk. T-code yang tepat?',['MIRO','FB60','F-28','ME21N'],1,'FB60 dipakai untuk invoice vendor tanpa PO.']}),
+L('Pembayaran dan monitoring hutang',{p:['Pembayaran rutin dijalankan dengan <b>Automatic Payment Program (F110)</b>: isi parameter (company code, payment method, tanggal pembayaran berikutnya, vendor), buat <b>proposal</b>, review dan edit, jalankan <b>payment run</b>, lalu buat file bank (DME) atau cetak. Invoice yang blocked otomatis tidak ikut.','Pembayaran manual memakai <b>F-53</b> (posting outgoing payment dan langsung meng-clear invoice). Untuk memantau hutang, pakai <b>FBL1N</b>: open items, cleared items, jatuh tempo, dan payment block.'],
+flow:[['Parameter F110','tanggal, vendor, metode'],['Proposal','daftar usulan bayar'],['Review','hapus/blok item'],['Payment run','dokumen KZ'],['File bank','DME / cetak']],
+tc:[['F110','Automatic payment program'],['F-53','Outgoing payment manual'],['FBL1N','Line item vendor (open/cleared)'],['F-44','Clearing manual akun vendor'],['F-48','Down payment ke vendor'],['S_ALR_87012078','Analisis jatuh tempo hutang (aging)']],
+tip:'Saat vendor menanyakan pembayaran: cari invoice di FBL1N. Jika masih open, cek kolom payment block dan jatuh tempo. Jika sudah cleared, nomor clearing document adalah bukti bayar.',
+keys:['F110: parameter → proposal → run → file bank','F-53 untuk bayar manual dan langsung clearing','FBL1N untuk menjawab status invoice'],
+cp:['Di F110, sebuah invoice tidak muncul di proposal walaupun sudah jatuh tempo. Penyebab yang paling mungkin?',['Invoice punya payment block (misalnya blocked dari MIRO)','Vendor punya NPWP','Invoice sudah di-park lalu diposting','Periode terbuka'],0,'Payment block membuat invoice dikecualikan dari proposal F110.']})
+],
+quiz:QZ([
+['Di S/4HANA, vendor dibuat dengan…',['XK01','BP (Business Partner)','MM01','FS00'],1,'Vendor dan customer adalah business partner.'],
+['Invoice jasa konsultan tanpa PO diposting dengan…',['MIRO','FB60','MIGO','F110'],1,'FB60.'],
+['Invoice dari MIRO berstatus blocked for payment. Artinya…',['Sudah dibayar','Ada selisih qty/harga terhadap PO atau GR di luar toleransi','Vendor diblokir permanen','Periode ditutup'],1,'3-way match gagal.'],
+['Langkah F110 yang memungkinkan review sebelum bayar adalah…',['Parameter','Proposal','Payment run','Print'],1,'Proposal bisa diedit sebelum payment run.'],
+['Laporan untuk melihat invoice vendor yang masih terbuka dan jatuh temponya?',['FBL1N','FBL5N','MB52','KSB1'],0,'FBL1N = vendor line items.']
+])},
+
+{id:'fi-ar',code:'FI-AR',cat:'fin',title:'FI – Accounts Receivable (Piutang)',dur:'30 mnt',
+sum:'Master customer, invoice dari SD dan manual, penerimaan pembayaran, dunning, dan aging piutang.',tcs:['BP','FB70','F-28','FBL5N','F150'],
+objs:['Memahami data customer di BP dan hubungannya dengan SD','Mengenali invoice dari billing SD dan invoice manual','Memposting penerimaan pembayaran dan clearing','Memantau piutang, aging, dan dunning'],
+note:'Tulis apa yang kamu lakukan jika customer membayar kurang dari nilai invoice.',
+lessons:[
+L('Master customer dan alur piutang',{p:['Customer dibuat sebagai <b>BP</b> dengan role FI customer (FLCU00) dan sales (FLCU01). Data AR penting: reconciliation account piutang, payment terms, dunning procedure, dan data kredit (dikelola FSCM Credit Management).','Sebagian besar piutang lahir otomatis dari <b>billing SD (VF01)</b>: saat billing diposting, SAP membuat dokumen akuntansi (document type RV) yang mendebit piutang customer dan mengkredit pendapatan serta PPN keluaran.'],
+flow:[['Sales order','VA01'],['Delivery & PGI','VL01N'],['Billing','VF01 → dokumen RV'],['Piutang open','FBL5N'],['Pembayaran','F-28 → clearing']],
+tc:[['BP','Membuat/mengubah customer'],['XD03 / FD03','Menampilkan customer (ECC)'],['FD10N','Saldo customer per periode'],['FB70','Invoice customer manual (non-SD), misalnya sewa'],['FB75','Credit memo customer manual']],
+keys:['Customer = BP dengan role FLCU00/FLCU01','Billing SD otomatis membuat piutang (RV)','FB70 hanya untuk invoice di luar SD'],
+cp:['Perusahaan menyewakan sebagian gudang ke pihak lain dan menagih tiap bulan tanpa proses penjualan. Invoice dibuat dengan…',['VF01','FB70','MIRO','FB60'],1,'FB70 untuk invoice customer tanpa proses SD.']}),
+L('Penerimaan pembayaran dan clearing',{p:['Pembayaran customer diposting dengan <b>F-28</b> (Post Incoming Payments): isi bank, jumlah, customer, lalu pilih invoice yang dibayar sehingga statusnya menjadi cleared. Di banyak perusahaan, langkah ini otomatis dari <b>bank statement elektronik</b> (FF_5) dengan aturan pencocokan.','Jika pembayaran kurang, ada dua pilihan: <b>partial payment</b> (invoice tetap open, pembayaran tercatat sebagai item terpisah) atau <b>residual item</b> (invoice di-clear dan sisa tagihan dibuat sebagai item baru). Selisih kecil bisa dibebankan ke akun selisih sesuai toleransi.'],
+tc:[['F-28','Incoming payment dan clearing'],['F-32','Clearing manual akun customer'],['FBL5N','Line item customer (open/cleared)'],['F-29','Down payment dari customer'],['Manage Customer Line Items','App Fiori line item customer']],
+tip:'Selalu minta bukti transfer berisi nomor invoice. Pembayaran tanpa referensi paling sering menjadi unapplied cash yang menggantung berbulan-bulan.',
+keys:['F-28 = terima pembayaran sekaligus clearing invoice','Partial payment vs residual item','Bank statement elektronik mengotomatiskan clearing'],
+cp:['Customer membayar Rp 90 jt untuk invoice Rp 100 jt dan berjanji melunasi sisanya bulan depan. Kamu ingin invoice lama tertutup dan sisa Rp 10 jt muncul sebagai item baru. Pilihan di F-28?',['Partial payment','Residual item','Reverse invoice','Write-off'],1,'Residual item meng-clear invoice asli dan membuat item baru untuk sisanya.']}),
+L('Aging, dunning, dan kualitas piutang',{p:['<b>Aging</b> mengelompokkan piutang berdasarkan umur jatuh tempo (belum jatuh tempo, 1–30, 31–60, 61–90, > 90 hari). Laporan ini dipakai untuk menentukan prioritas penagihan dan cadangan kerugian piutang.','<b>Dunning (F150)</b> mengirim surat pengingat bertingkat sesuai dunning procedure. Untuk proses penagihan yang lebih terstruktur (worklist, promise to pay, dispute), perusahaan memakai FSCM Collections dan Dispute Management.'],
+tc:[['S_ALR_87012178','Analisis jatuh tempo piutang (aging)'],['F150','Dunning run'],['FBL5N','Open item per customer, filter jatuh tempo'],['FD32 / UKM_BP','Data kredit customer (ECC / S/4 FSCM)']],
+integ:'Status kredit customer dipakai SD saat sales order dibuat. Piutang lewat jatuh tempo bisa membuat order baru otomatis tertahan (credit block).',
+keys:['Aging = dasar prioritas penagihan','F150 untuk surat pengingat bertingkat','Piutang macet memengaruhi credit check di SD'],
+cp:['Sales mengeluh order customer A tertahan, padahal stok ada. Hal yang perlu kamu cek di AR?',['Apakah customer punya piutang lewat jatuh tempo atau melewati limit kredit','Harga material','Movement type','Jadwal F110'],0,'Credit block di SD biasanya dipicu oleh limit kredit atau piutang overdue.']})
+],
+quiz:QZ([
+['Billing SD yang diposting membuat dokumen akuntansi dengan document type…',['KR','RV','SA','WE'],1,'RV = billing document transfer.'],
+['Invoice customer manual tanpa SD memakai…',['FB70','FB60','VF01','F-53'],0,'FB70.'],
+['T-code untuk memposting penerimaan pembayaran customer dan clearing?',['F-53','F-28','F110','FB08'],1,'F-28 = incoming payment.'],
+['Laporan untuk melihat piutang per kelompok umur?',['S_ALR_87012178','MB52','ME2N','CJI3'],0,'Customer open items due date analysis.'],
+['Fungsi F150?',['Pembayaran vendor','Dunning (surat pengingat bertingkat)','Penyusutan','Settlement order'],1,'F150 = dunning run.']
+])},
+
+{id:'co',code:'CO',cat:'fin',title:'CO – Controlling',dur:'40 mnt',
+sum:'Cost center, profit center, internal order, dan product costing untuk analisis biaya internal.',tcs:['KS03','KSB1','KE5Z','KO03','CK11N'],
+objs:['Membedakan cost center, profit center, dan internal order','Membaca laporan plan vs actual','Memahami budget dan settlement internal order','Memahami standard cost dan variance produksi'],
+note:'Pilih satu cost center di unitmu. Tulis tiga biaya terbesarnya dan siapa yang bisa memengaruhinya.',
+lessons:[
+L('Cost Center Accounting',{p:['<b>Cost center</b> adalah unit yang menanggung biaya, misalnya Produksi Line 1, Gudang, atau HR. Cost center disusun dalam <b>standard hierarchy</b> di bawah satu <b>controlling area</b>. Biaya masuk lewat <b>cost element</b>: primary (dari akun G/L seperti gaji, listrik) dan secondary (alokasi internal, misalnya assessment biaya utilitas ke departemen lain).','Siklus bulanan: plan biaya (KP06), posting aktual dari FI/MM/HR, alokasi (assessment/distribution), lalu analisis <b>plan vs actual</b>.'],
+tc:[['KS01 / KS03','Membuat / menampilkan cost center'],['KP06','Planning biaya per cost element'],['KSB1','Line item biaya aktual cost center'],['S_ALR_87013611','Laporan plan/actual per cost center'],['KSU5','Menjalankan assessment']],
+keys:['Cost center = tempat biaya, bukan tempat laba','Primary dari G/L, secondary dari alokasi internal','KSB1 untuk menelusuri sampai dokumen sumber'],
+cp:['Manajer gudang bertanya kenapa biaya cost center-nya naik Rp 30 jt bulan ini. Laporan pertama yang paling membantu?',['KSB1 untuk line item biaya cost center tersebut','MB52','F110','VA05'],0,'KSB1 menampilkan setiap posting beserta dokumen asalnya.']}),
+L('Profit Center Accounting',{p:['<b>Profit center</b> mengukur kinerja (pendapatan dan biaya) per unit bisnis, produk, atau wilayah. Di S/4HANA, profit center terisi otomatis di setiap line item Universal Journal: dari material (master plant), cost center, WBS, atau sales order.','Dengan profit center, manajemen bisa membuat laba rugi internal per lini produk. <b>Segment</b> di atas profit center dipakai untuk pelaporan segmen sesuai standar akuntansi.'],
+tc:[['KE51 / KE53','Membuat / menampilkan profit center'],['KE5Z','Line item aktual profit center'],['KCH1','Profit center group/hierarki'],['Profit Center – Actuals','App Fiori analisis profit center']],
+integ:'Profit center diturunkan dari objek lain. Jika profit center di master material atau cost center salah, laporan laba per lini produk ikut salah walaupun posting FI benar.',
+keys:['Profit center = ukuran kinerja (laba)','Diisi otomatis dari material, cost center, WBS, sales order','Segment untuk pelaporan eksternal'],
+cp:['Laporan laba per lini produk menunjukkan pendapatan produk A masuk ke profit center produk B. Penyebab yang paling mungkin?',['Profit center di master material A salah diisi','KSB1 rusak','Customer salah','F110 belum jalan'],0,'Profit center pada line item penjualan diturunkan dari master material.']}),
+L('Internal Order',{p:['<b>Internal order</b> menampung biaya kegiatan sementara: event marketing, perbaikan besar, atau proyek CAPEX kecil. Order bisa diberi <b>budget</b> (KO22) sehingga SAP memberi peringatan atau menolak posting jika budget terlampaui (availability control).','Di akhir periode, biaya order di-<b>settle</b> ke penerima akhir (cost center, aset/AuC, atau G/L) sesuai <b>settlement rule</b>. Order investasi biasanya di-settle ke AuC, lalu ke aset final.'],
+flow:[['KO01','buat order + settlement rule'],['KO22','budget'],['Posting biaya','PO, GI, jurnal'],['KOB1','monitor actual'],['KO88','settlement'],['TECO/close','order ditutup']],
+tc:[['KO01 / KO03','Membuat / menampilkan internal order'],['KO22','Budget order'],['KOB1','Line item aktual order'],['KO88 / KO8G','Settlement satu / banyak order'],['S_ALR_87012993','Laporan plan/actual order']],
+keys:['Internal order untuk kegiatan sementara','Budget + availability control mencegah overspending','Settlement memindahkan biaya ke penerima akhir'],
+cp:['Event pameran selesai dan biaya Rp 75 jt masih di internal order. Supaya masuk ke cost center Marketing, yang dilakukan adalah…',['Settlement order (KO88) ke cost center Marketing','Hapus order','Jurnal manual FB50','Tidak perlu, sudah otomatis'],0,'Settlement memindahkan biaya ke penerima di settlement rule.']}),
+L('Product Costing',{p:['<b>Product costing</b> menghitung biaya standar produk dari <b>BOM</b> (bahan) dan <b>routing</b> (aktivitas mesin/tenaga kerja dengan tarif dari cost center), ditambah overhead lewat costing sheet. Cost estimate dibuat dengan <b>CK11N</b>, lalu di-<b>mark & release</b> (CK24) menjadi standard price di master material.','Saat produksi, biaya aktual production order dibandingkan dengan standar. Selisihnya (<b>variance</b>, dihitung KKS2) di-settle ke laba rugi. Variance besar menandakan resep, routing, harga beli, atau efisiensi produksi tidak sesuai rencana.'],
+flow:[['BOM + routing','data PP'],['CK11N','cost estimate'],['CK24','mark & release'],['Produksi','actual cost order'],['KKS2','variance'],['KO88','settle ke P&L']],
+tc:[['CK11N / CK13N','Membuat / menampilkan cost estimate'],['CK24','Mark & release standard price'],['KKS2','Variance production order'],['CKMLCP','Actual costing (material ledger) di akhir periode']],
+integ:'Product costing bergantung pada data PP (BOM, routing, work center) dan harga beli MM. Kesalahan qty di BOM langsung membuat standard cost salah.',
+keys:['Standard cost = BOM + routing + overhead','CK11N lalu CK24 untuk menjadi harga standar','Variance = actual – standar, dianalisis tiap periode'],
+cp:['Variance production order produk X selalu negatif besar karena pemakaian gula 10% lebih tinggi dari standar. Area yang perlu dicek pertama?',['Qty komponen di BOM dan pencatatan GI ke order','Data vendor','Setting F110','Profit center hierarki'],0,'Variance bahan berasal dari BOM yang tidak akurat atau pemakaian aktual yang lebih tinggi.']})
+],
+quiz:QZ([
+['Biaya listrik bulanan untuk area Gudang dicatat ke…',['Cost center Gudang','Profit center','Customer','Material'],0,'Cost center menampung biaya unit.'],
+['Objek CO yang mengukur laba per lini produk?',['Cost center','Profit center','Internal order','Cost element'],1,'Profit center.'],
+['T-code settlement internal order?',['KO88','KSB1','CK11N','KE51'],0,'KO88.'],
+['Standard price dirilis ke master material dengan…',['CK11N','CK24','KKS2','KP06'],1,'CK24 mark & release.'],
+['Line item aktual cost center dilihat di…',['KSB1','KOB1','KE5Z','CJI3'],0,'KSB1.']
+])},
+
+{id:'tr',code:'TR',cat:'fin',title:'TR – Treasury: Kas, Bank & Likuiditas',dur:'30 mnt',
+sum:'House bank, bank statement, cash position, liquidity forecast, dan transaksi treasury.',tcs:['FF_5','FF67','FF7A','FF7B','FTR_CREATE'],
+objs:['Memahami house bank dan akun bank di SAP','Memproses bank statement dan rekonsiliasi','Membaca cash position dan liquidity forecast','Mengenal transaksi treasury dan pengelolaan risiko'],
+note:'Tulis jadwal harian proses bank statement di perusahaanmu dan siapa yang menindaklanjuti item yang tidak cocok.',
+lessons:[
+L('House bank dan bank statement',{p:['Setiap rekening perusahaan dicatat sebagai <b>house bank + account ID</b> yang terhubung ke akun G/L bank. Biasanya ada akun utama bank dan beberapa <b>clearing account</b> (misalnya incoming dan outgoing) untuk menampung transaksi yang belum dicocokkan.','<b>Bank statement elektronik</b> (MT940/CAMT.053) diimpor dengan FF_5. SAP membaca baris mutasi, mencocokkan dengan invoice atau pembayaran (misalnya dari nomor referensi), lalu memposting dan meng-clear otomatis. Baris yang tidak cocok diproses manual (FEBAN).'],
+flow:[['Impor statement','FF_5'],['Auto-matching','posting + clearing'],['Sisa tidak cocok','FEBAN'],['Rekonsiliasi','saldo bank = G/L']],
+tc:[['FF_5','Impor bank statement elektronik'],['FF67','Bank statement manual'],['FEBAN','Postprocessing statement yang belum cocok'],['Manage Bank Accounts','App Fiori bank account management (S/4)'],['Bank Statement Monitor','App Fiori status statement per bank']],
+keys:['House bank + account ID ↔ akun G/L bank','Clearing account menampung transaksi belum cocok','FF_5 impor otomatis, FEBAN untuk sisa'],
+cp:['Saldo akun G/L bank berbeda dengan mutasi rekening koran. Yang paling sering menjadi penyebab?',['Baris bank statement yang belum diproses atau belum dicocokkan','FSV salah','Material master','Profit center'],0,'Item di clearing account yang belum diproses membuat saldo berbeda.']}),
+L('Cash position dan liquidity forecast',{p:['<b>Cash position</b> menunjukkan posisi kas hari ini dan beberapa hari ke depan berdasarkan saldo bank dan transaksi yang segera terjadi. <b>Liquidity forecast</b> melihat lebih jauh: piutang yang akan masuk, hutang yang akan jatuh tempo, PO, dan sales order.','Data dikelompokkan dalam <b>planning level</b> dan <b>planning group</b> (misalnya vendor lokal, vendor impor, customer domestik). Transaksi yang belum ada di sistem (misalnya rencana pajak) bisa dimasukkan sebagai <b>memo record</b> (FF63).'],
+tc:[['FF7A','Cash position'],['FF7B','Liquidity forecast'],['FF63','Memo record'],['Cash Position / Cash Flow Analyzer','App Fiori cash management S/4']],
+integ:'Forecast mengambil data dari AP (jatuh tempo invoice), AR (perkiraan penerimaan), MM (PO), dan SD (sales order). Data jatuh tempo yang salah di modul lain membuat forecast kas meleset.',
+keys:['Cash position = jangka sangat pendek','Liquidity forecast = mingguan/bulanan dari AP, AR, MM, SD','Memo record untuk rencana yang belum ada dokumennya'],
+cp:['Treasury ingin tahu apakah kas cukup untuk pembayaran vendor besar dua minggu lagi. Laporan yang paling tepat?',['Liquidity forecast (FF7B)','MB52','KSB1','FBL3N'],0,'Liquidity forecast menggabungkan arus masuk dan keluar ke depan.']}),
+L('Transaksi treasury dan risiko',{p:['Modul Treasury & Risk Management mencatat <b>deal</b> seperti deposito berjangka, pinjaman, dan forward valas dengan FTR_CREATE. Setiap deal punya siklus: kontrak → settlement → posting ke FI → jatuh tempo.','Pembayaran keluar dalam jumlah besar biasanya lewat <b>Bank Communication Management (BCM)</b>: file pembayaran dari F110 dikumpulkan, disetujui berjenjang, lalu dikirim ke bank. Ini mengurangi risiko pembayaran ganda atau tidak sah.'],
+tc:[['FTR_CREATE','Membuat deal treasury'],['FTR_EDIT','Mengubah/menampilkan deal'],['BNK_APP','Approval batch pembayaran (BCM)'],['TPM1','Valuasi akhir periode transaksi keuangan']],
+tip:'Pisahkan peran pembuat deal, approver, dan yang memposting ke FI (segregation of duties). Ini sering menjadi temuan audit treasury.',
+keys:['Deal: kontrak → settlement → posting → jatuh tempo','BCM menambah approval berjenjang untuk pembayaran','Pisahkan peran pembuat dan approver'],
+cp:['Kenapa pembayaran hasil F110 sebaiknya lewat approval BCM sebelum dikirim ke bank?',['Agar ada kontrol berjenjang dan mencegah pembayaran tidak sah atau ganda','Agar invoice ter-clear','Agar periode tertutup','Tidak ada manfaatnya'],0,'BCM menambah lapisan kontrol sebelum uang keluar.']})
+],
+quiz:QZ([
+['T-code impor bank statement elektronik?',['FF_5','F110','FB50','MIRO'],0,'FF_5.'],
+['Laporan posisi kas hari ini dan beberapa hari ke depan?',['FF7A','FF7B','FBL1N','F.01'],0,'FF7A cash position.'],
+['Transaksi yang belum ada dokumennya tapi perlu masuk forecast dicatat sebagai…',['Memo record (FF63)','Purchase order','Accrual','Dunning'],0,'Memo record.'],
+['Deal deposito berjangka dibuat dengan…',['FTR_CREATE','ME21N','FB60','KO01'],0,'FTR_CREATE.'],
+['Baris bank statement yang tidak otomatis cocok diproses di…',['FEBAN','MB51','VA02','IW38'],0,'FEBAN postprocessing.']
+])},
+
+{id:'fscm',code:'FSCM',cat:'fin',title:'FSCM – Credit, Dispute & Collections',dur:'30 mnt',
+sum:'Credit management, dispute management, dan collections management untuk piutang yang sehat.',tcs:['UKM_BP','UKM_CASE','UDM_DISPUTE','UDM_SPECIALIST'],
+objs:['Mengatur limit kredit dan memahami credit check di sales order','Mencatat dan menyelesaikan dispute piutang','Bekerja dengan worklist collections dan promise to pay'],
+note:'Tulis tiga alasan dispute yang paling sering dari customer-mu dan siapa yang menyelesaikannya.',
+lessons:[
+L('Credit management',{p:['Setiap customer punya <b>credit segment</b> di BP (role UKM000) berisi <b>credit limit</b>, <b>risk class</b>, dan score. Saat sales order atau delivery dibuat, SD menjalankan <b>credit check</b>: jika exposure (piutang + order terbuka) melebihi limit atau ada piutang overdue, dokumen diberi <b>credit block</b>.','Credit analyst memutuskan dokumen yang tertahan: rilis, tolak, atau minta jaminan. Keputusan tercatat di <b>documented credit decision</b> sehingga bisa diaudit.'],
+flow:[['Sales order','VA01'],['Credit check','limit & overdue'],['Credit block','order tertahan'],['Review','UKM_CASE'],['Rilis / tolak','order lanjut']],
+tc:[['UKM_BP','Data kredit business partner'],['UKM_CASE','Credit case / documented credit decision'],['UKM_MY_DCDS','Daftar keputusan kredit milik saya'],['VKM1 / VKM3','Rilis dokumen SD yang diblokir (ECC)']],
+keys:['Credit segment: limit, risk class, score','Credit check di SD menghasilkan credit block','Keputusan rilis terdokumentasi'],
+cp:['Exposure customer Rp 480 jt, limit Rp 500 jt. Order baru Rp 50 jt dibuat. Apa yang terjadi?',['Order masuk credit block karena exposure menjadi Rp 530 jt','Order langsung jalan','Customer dihapus','Invoice dibatalkan'],0,'Exposure baru melewati limit sehingga credit check menahan order.']}),
+L('Dispute management',{p:['<b>Dispute case</b> dibuat saat customer menolak membayar sebagian/seluruh invoice, misalnya karena harga tidak sesuai, barang rusak, atau qty kurang. Case bisa dibuat langsung dari residual item di F-28 atau dari FBL5N.','Case punya <b>reason</b>, <b>root cause</b>, nominal sengketa, dan orang yang bertanggung jawab (sales, gudang, QC). Saat selesai, hasilnya bisa credit memo, write-off, atau customer membayar penuh. Laporan dispute membantu menemukan masalah berulang.'],
+tc:[['UDM_DISPUTE','Mengelola dispute case'],['FBL5N','Membuat dispute dari line item customer'],['Manage Dispute Cases','App Fiori dispute']],
+integ:'Penyelesaian dispute sering butuh data dari SD (harga, delivery), QM (barang rusak), dan LE (bukti terima). Credit memo dibuat di SD lalu diposting ke AR.',
+keys:['Dispute = alasan + root cause + penanggung jawab','Bisa dibuat dari pembayaran kurang (residual)','Hasil: credit memo, write-off, atau bayar penuh'],
+cp:['Customer membayar kurang Rp 5 jt karena 10 karton rusak saat diterima. Langkah yang tepat?',['Buat dispute case dengan reason barang rusak dan libatkan gudang/QC','Langsung write-off','Hapus invoice','Blok customer selamanya'],0,'Dispute case mendokumentasikan dan mengarahkan penyelesaian ke pihak yang tepat.']}),
+L('Collections management',{p:['Collections management membuat <b>worklist</b> harian untuk collector berdasarkan <b>collection strategy</b> (misalnya prioritas nilai overdue tertinggi atau customer berisiko tinggi).','Collector menelepon customer, mencatat hasilnya, dan merekam <b>promise to pay</b>. Jika janji tidak ditepati, item naik prioritas di worklist berikutnya. Supervisor memantau beban kerja dan hasil tiap collector.'],
+tc:[['UDM_SPECIALIST','Worklist collector'],['UDM_SUPERVISOR','Monitoring dan pembagian worklist'],['Process Receivables','App Fiori untuk collector']],
+keys:['Collection strategy menentukan prioritas','Promise to pay tercatat dan dipantau','Supervisor memantau worklist tim'],
+cp:['Customer berjanji membayar Jumat. Apa yang sebaiknya dicatat di sistem?',['Promise to pay dengan tanggal dan nominal','Tidak perlu dicatat','Dispute case','Credit memo'],0,'Promise to pay membuat tindak lanjut otomatis jika janji tidak dipenuhi.']})
+],
+quiz:QZ([
+['Credit block di sales order biasanya disebabkan oleh…',['Exposure melewati limit atau ada piutang overdue','Harga material','Movement type','Profit center'],0,'Credit check.'],
+['Dispute case dikelola dengan…',['UDM_DISPUTE','UKM_BP','F110','MIRO'],0,'UDM_DISPUTE.'],
+['Worklist harian collector ada di…',['UDM_SPECIALIST','FB60','KO88','CK11N'],0,'UDM_SPECIALIST.'],
+['Data credit limit customer di S/4HANA disimpan di…',['Credit segment business partner (UKM_BP)','Master material','Cost center','Vendor'],0,'UKM_BP.'],
+['Promise to pay berguna untuk…',['Memantau janji bayar dan menaikkan prioritas jika tidak ditepati','Memblokir vendor','Menutup periode','Menghitung penyusutan'],0,'Bagian collections management.']
+])}
+];
+
+/* ===================== LOGISTIK & HR ===================== */
+const MODS_LOG=[
+{id:'sd',code:'SD',cat:'log',title:'SD – Sales & Distribution',dur:'40 mnt',
+sum:'Order to cash: struktur penjualan, sales order, pricing, delivery, billing, dan retur.',tcs:['VA01','VA03','VL01N','VF01','VA05'],
+objs:['Memahami sales area dan master data penjualan','Mengikuti alur order to cash dan document flow','Membuat sales order dengan pricing dan tanggal yang benar','Memproses delivery, PGI, billing, dan retur'],
+note:'Tulis urutan dokumen order to cash di perusahaanmu beserta siapa yang membuat tiap dokumen.',
+lessons:[
+L('Struktur organisasi & master data penjualan',{p:['Penjualan terjadi dalam <b>sales area</b> = sales organization + distribution channel + division. Contoh: sales org 1000, channel 10 (modern trade), division 00. Pengiriman dilakukan dari <b>shipping point</b> di plant.','Master data utama: <b>customer (BP)</b> dengan data sales area (payment terms, incoterms, partner function sold-to/ship-to/bill-to/payer), <b>material</b> dengan view Sales, dan <b>condition record</b> harga/diskon.'],
+tc:[['BP','Customer dengan data sales area'],['VK11 / VK13','Membuat / menampilkan condition record harga'],['VD51','Customer-material info (kode material versi customer)'],['MM03','View Sales: Sales Org dan Sales: General/Plant']],
+keys:['Sales area = sales org + channel + division','Partner function: sold-to, ship-to, bill-to, payer','Harga dari condition record (VK11)'],
+cp:['Customer modern trade punya banyak gudang tujuan, tetapi tagihan dikirim ke kantor pusat. Partner function apa yang membedakan alamat kirim dan alamat tagih?',['Ship-to dan bill-to','Vendor dan plant','Sales org dan division','Sold-to dan material'],0,'Ship-to = tujuan kirim, bill-to = penerima tagihan.']}),
+L('Alur order to cash',{p:['Satu transaksi penjualan menghasilkan rangkaian dokumen yang saling terhubung. <b>Document flow</b> (tombol di VA03/VL03N/VF03) menunjukkan seluruh rantai: order, delivery, transfer order/picking, goods issue, billing, dan dokumen akuntansi.','Setiap langkah punya pemilik: sales admin membuat order, gudang memproses delivery dan PGI, billing dibuat sales admin atau otomatis (VF04), dan AR menerima pembayaran.'],
+flow:[['Inquiry/quotation','VA11 / VA21'],['Sales order','VA01'],['Delivery','VL01N'],['Picking & PGI','mvt 601'],['Billing','VF01'],['Pembayaran','F-28']],
+tc:[['VA01 / VA02 / VA03','Membuat / mengubah / menampilkan sales order'],['VA05','Daftar sales order'],['VL01N','Outbound delivery dengan referensi order'],['VF01','Billing document'],['VF04','Billing due list (kolektif)']],
+integ:'PGI (movement type 601) mengurangi stok dan memposting HPP di FI. Billing memposting piutang dan pendapatan. Jadi satu order menyentuh MM, LE, FI, dan CO-PA.',
+keys:['Order → delivery → PGI (601) → billing → pembayaran','Document flow menunjukkan status seluruh rantai','PGI = stok berkurang + HPP; billing = piutang + pendapatan'],
+cp:['Customer bilang barang sudah diterima tapi belum ada tagihan. Di document flow sales order terlihat delivery dan goods issue selesai. Langkah yang belum dilakukan?',['Billing (VF01)','Sales order','Picking','Credit check'],0,'Setelah PGI, langkah berikutnya adalah billing.']}),
+L('Membuat sales order',{p:['Di VA01 pilih <b>order type</b> (OR = standard order) dan sales area. Isi sold-to, ship-to, <b>PO number customer</b>, requested delivery date, lalu item material dan qty. SAP otomatis menghitung harga (kondisi PR00, diskon, pajak), menjalankan <b>availability check (ATP)</b>, dan credit check.','Perhatikan <b>incompletion log</b>: jika data wajib belum lengkap (misalnya payment terms atau harga), order tersimpan tapi tidak bisa dikirim atau ditagih. Cek juga blok (credit block, delivery block, billing block) di header.'],
+tc:[['VA01','Create sales order'],['V.02','Daftar order yang belum lengkap (incomplete)'],['VA14L','Sales document blocked for delivery'],['CO09','Availability overview material']],
+tip:'Selalu isi PO number customer. Banyak customer menolak invoice tanpa nomor PO mereka, dan nomor ini memudahkan rekonsiliasi pembayaran.',
+keys:['OR = standard order','Pricing, ATP, dan credit check berjalan otomatis','Incompletion log dan blok harus bersih sebelum kirim'],
+cp:['Order tersimpan dengan pesan "Document is incomplete". Akibatnya?',['Order mungkin tidak bisa di-deliver atau ditagih sampai datanya dilengkapi','Order otomatis terhapus','Stok langsung berkurang','Tidak ada akibat'],0,'Incompletion log memblokir proses berikutnya sesuai konfigurasi.']}),
+L('Delivery, billing, dan retur',{p:['Delivery (VL01N) dibuat dari order yang jatuh tempo kirim. Gudang melakukan picking (bisa lewat transfer order WM/EWM), packing, lalu <b>Post Goods Issue</b>. Monitor semua delivery dengan VL06O.','Billing (VF01) mengambil harga dari order dan qty dari delivery. Untuk retur: buat <b>returns order</b> (order type RE), returns delivery dan goods receipt (mvt 651), lalu <b>credit memo</b> untuk customer.'],
+flow:[['VL01N','delivery'],['Picking','TO / warehouse task'],['PGI','601'],['VF01','billing F2'],['Retur','RE → 651 → credit memo']],
+tc:[['VL01N / VL02N','Membuat / mengubah delivery, termasuk PGI'],['VL06O','Outbound delivery monitor'],['VF01 / VF03','Membuat / menampilkan billing'],['VF11','Membatalkan billing']],
+keys:['PGI dilakukan di delivery','Billing = harga dari order, qty dari delivery','Retur: RE order → 651 → credit memo'],
+cp:['Billing sudah dibuat tetapi harga salah. Cara koreksi yang benar?',['Batalkan billing dengan VF11, perbaiki harga/kondisi, lalu billing ulang','Ubah jumlah di FB02','Hapus delivery','Buat sales order baru tanpa membatalkan'],0,'Billing dibatalkan dengan VF11 sehingga dokumen akuntansinya ikut dibalik.']})
+],
+quiz:QZ([
+['Sales area terdiri dari…',['Sales org + distribution channel + division','Plant + sloc','Company code + plant','Customer + material'],0,'Sales area.'],
+['Movement type saat PGI delivery penjualan?',['101','601','261','311'],1,'601.'],
+['T-code membuat billing document?',['VF01','VL01N','VA01','MIRO'],0,'VF01.'],
+['Laporan untuk memantau outbound delivery?',['VL06O','ME2N','MB52','CJI3'],0,'VL06O.'],
+['Urutan yang benar…',['VA01 → VL01N → PGI → VF01','VF01 → VA01 → VL01N','VL01N → VA01 → VF01','VA01 → VF01 → VL01N'],0,'Order, delivery, PGI, billing.']
+])},
+
+{id:'pp',code:'PP',cat:'log',title:'PP – Production Planning',dur:'35 mnt',
+sum:'BOM, work center, routing, MRP, planned order, production order, dan konfirmasi produksi.',tcs:['CS03','MD04','MD01N','CO01','CO11N'],
+objs:['Memahami master data produksi: BOM, work center, routing','Menjalankan dan membaca hasil MRP (MD04)','Membuat, merilis, dan mengonfirmasi production order','Menutup order dan memahami settlement'],
+note:'Pilih satu produk. Tulis komponen BOM utamanya dan work center yang dilalui.',
+lessons:[
+L('Master data produksi',{p:['<b>BOM</b> (bill of material) berisi komponen dan qty untuk membuat satu produk. <b>Work center</b> adalah mesin atau line produksi dengan kapasitas dan tarif aktivitas. <b>Routing</b> berisi urutan operasi di work center beserta waktu standar.','BOM dan routing dihubungkan oleh <b>production version</b>. View MRP di master material menentukan cara perencanaan: MRP type (PD), lot size, safety stock, dan in-house production time.'],
+tc:[['CS01 / CS03','Membuat / menampilkan BOM'],['CR01 / CR03','Membuat / menampilkan work center'],['CA01 / CA03','Membuat / menampilkan routing'],['C223','Production version']],
+integ:'BOM dan routing juga dipakai CO untuk menghitung standard cost (CK11N). Kesalahan qty BOM berdampak ke perencanaan dan biaya sekaligus.',
+keys:['BOM = apa yang dibutuhkan','Routing = bagaimana dan di mana dibuat','Production version menghubungkan keduanya'],
+cp:['Produksi selalu kekurangan kemasan karena pemakaian riil 1.050 pcs per 1.000 produk, sedangkan BOM mencatat 1.000. Apa yang perlu diperbaiki?',['Qty atau scrap komponen kemasan di BOM','Routing','Data vendor','Profit center'],0,'BOM menentukan kebutuhan komponen di MRP.']}),
+L('MRP dan MD04',{p:['<b>MRP</b> membandingkan kebutuhan (sales order, forecast/PIR dari MD61, reservasi) dengan stok dan penerimaan yang sudah direncanakan. Jika kurang, MRP membuat <b>planned order</b> (produksi sendiri) atau <b>purchase requisition</b> (beli).','<b>MD04</b> (stock/requirements list) adalah layar paling penting planner: daftar kebutuhan dan penerimaan per tanggal dengan stok tersedia berjalan, ditambah <b>exception message</b> seperti "reschedule in" atau "start date in the past".'],
+flow:[['PIR / sales order','MD61, VA01'],['MRP run','MD01N / MD02'],['MD04','evaluasi + exception'],['Konversi','planned order → production order / PR']],
+tc:[['MD61','Planned independent requirements (forecast)'],['MD01N','MRP Live (S/4HANA)'],['MD02','MRP satu material'],['MD04','Stock/requirements list'],['MD06','Daftar MRP lists dengan exception']],
+keys:['MRP: kebutuhan vs stok + penerimaan','Hasil: planned order atau purchase requisition','MD04 + exception message = alat kerja harian planner'],
+cp:['Di MD04 muncul exception "Reschedule in" untuk sebuah PO bahan baku. Artinya…',['Penerimaan PO itu terlalu lambat; perlu dimajukan agar stok tidak minus','PO harus dihapus','Stok berlebih','Tidak ada masalah'],0,'Reschedule in = majukan tanggal penerimaan.']}),
+L('Production order sampai penutupan',{p:['Planned order dikonversi menjadi <b>production order</b> (CO40) atau dibuat langsung dengan <b>CO01</b>. Setelah di-<b>release</b>, shop floor bisa mengambil komponen (GI 261, sering lewat backflush) dan melaporkan hasil dengan <b>konfirmasi CO11N</b>.','Barang jadi diterima ke gudang dengan GR 101 terhadap order (bisa otomatis saat konfirmasi). Setelah selesai, order di-<b>TECO</b>, variance dihitung, dan biaya di-settle (KO88).'],
+flow:[['CO01 / CO40','buat order'],['Release','status REL'],['GI 261','komponen'],['CO11N','konfirmasi'],['GR 101','barang jadi'],['TECO + settle','KO88']],
+tc:[['CO01 / CO02 / CO03','Membuat / mengubah / menampilkan production order'],['CO40','Konversi planned order'],['CO11N','Konfirmasi operasi'],['COOIS','Daftar production order (info system)'],['COHV','Mass processing order']],
+keys:['Order harus REL sebelum GI dan konfirmasi','GI 261 komponen, GR 101 barang jadi','TECO lalu settlement'],
+cp:['Operator tidak bisa melakukan konfirmasi di CO11N untuk order baru. Penyebab yang paling mungkin?',['Order belum di-release','BOM terlalu panjang','Customer belum bayar','Periode FI tertutup'],0,'Konfirmasi butuh status REL.']})
+],
+quiz:QZ([
+['Laporan kebutuhan vs stok per material untuk planner?',['MD04','MB52','ME5A','FBL1N'],0,'MD04.'],
+['Output MRP untuk material yang dibeli dari vendor?',['Purchase requisition','Production order','Sales order','Billing'],0,'Purchase requisition.'],
+['Konfirmasi produksi dengan…',['CO11N','CO01','CS03','MD61'],0,'CO11N.'],
+['Movement type komponen dikeluarkan ke production order?',['261','101','601','221'],0,'261.'],
+['Routing berisi…',['Urutan operasi di work center dan waktu standar','Daftar komponen','Harga jual','Data customer'],0,'Routing.']
+])},
+
+{id:'qm',code:'QM',cat:'log',title:'QM – Quality Management',dur:'30 mnt',
+sum:'Inspection lot, result recording, usage decision, dan quality notification.',tcs:['QA32','QE51N','QA11','QM01'],
+objs:['Memahami master data inspeksi','Memproses inspection lot dari GR sampai usage decision','Mencatat keluhan dengan quality notification'],
+note:'Tulis tiga karakteristik inspeksi yang paling penting untuk bahan baku di perusahaanmu.',
+lessons:[
+L('Master data QM',{p:['QM aktif per material lewat view <b>Quality Management</b> dengan <b>inspection type</b>: 01 (GR dari pembelian), 04 (GR dari produksi), 89 (inspeksi lain). Jika aktif, GR masuk ke stok <b>quality inspection</b>, bukan unrestricted.','Apa yang diperiksa ditentukan oleh <b>inspection plan</b> (QP01) berisi <b>master inspection characteristic</b> (QS21) seperti kadar air, warna, berat, ditambah <b>sampling procedure</b> (berapa sampel).'],
+tc:[['QS21 / QS23','Master inspection characteristic'],['QP01 / QP03','Inspection plan'],['QDV1','Sampling procedure'],['MM02 (view QM)','Mengaktifkan inspection type di material']],
+keys:['Inspection type 01 = GR pembelian, 04 = GR produksi','GR material QM masuk ke stok quality inspection','Inspection plan + karakteristik + sampling'],
+cp:['Setelah GR, bahan baku tidak muncul di stok unrestricted tetapi di quality inspection. Kenapa?',['Material punya inspection type 01 aktif sehingga harus diperiksa QC dulu','GR gagal','Vendor diblokir','Material salah'],0,'Itu perilaku normal QM.']}),
+L('Inspection lot sampai usage decision',{p:['GR membuat <b>inspection lot</b> otomatis. QC melihat lot terbuka di worklist <b>QA32</b>, mengambil sampel, dan mencatat hasil per karakteristik (<b>QE51N</b>).','Keputusan akhir adalah <b>usage decision</b> (QA11): accept atau reject. Di tab stock posting, stok dipindah dari quality inspection ke unrestricted, blocked, scrap, atau retur ke vendor.'],
+flow:[['GR 101','lot dibuat'],['QA32','worklist'],['QE51N','hasil uji'],['QA11','usage decision'],['Stock posting','unrestricted / blocked']],
+tc:[['QA32','Worklist inspection lot'],['QE51N','Result recording'],['QA11','Usage decision'],['QA33','Daftar inspection lot']],
+integ:'Sampai usage decision, stok QI tidak bisa dipakai produksi atau dikirim. Lot yang menumpuk di QA32 sering menjadi penyebab material "ada tapi tidak bisa dipakai".',
+keys:['Lot dibuat otomatis saat GR','Hasil dicatat per karakteristik','Usage decision menentukan nasib stok'],
+cp:['Produksi butuh bahan yang sudah lolos uji lab, tapi stoknya masih di QI. Apa yang belum dilakukan QC?',['Usage decision dengan stock posting ke unrestricted (QA11)','GR ulang','Membuat PO','Konfirmasi produksi'],0,'Usage decision memindahkan stok ke unrestricted.']}),
+L('Quality notification',{p:['<b>Quality notification</b> (QM01) mencatat masalah mutu: keluhan customer (Q1), keluhan ke vendor (Q2), atau masalah internal (Q3). Isinya defect, penyebab, tugas perbaikan, dan penanggung jawab, mirip format 8D.','Notifikasi bisa dibuat dari usage decision (reject) atau dari keluhan customer. Laporan notifikasi membantu menilai kinerja vendor dan masalah berulang.'],
+tc:[['QM01 / QM02 / QM03','Membuat / mengubah / menampilkan notification'],['QM10','Daftar notification'],['QGA2','Laporan inspection lot / defect']],
+keys:['Q1 customer, Q2 vendor, Q3 internal','Isi: defect, cause, task, responsible','Dasar evaluasi vendor dan perbaikan berulang'],
+cp:['Bahan dari vendor berulang kali gagal uji kadar air. Dokumen QM yang tepat untuk menindaklanjuti ke vendor?',['Quality notification ke vendor (Q2)','Sales order','Production order','Cost center'],0,'Q2 untuk keluhan ke vendor.']})
+],
+quiz:QZ([
+['Inspection type untuk GR dari pembelian?',['01','04','89','101'],0,'01.'],
+['Worklist inspection lot?',['QA32','QM01','MD04','VL06O'],0,'QA32.'],
+['Result recording dengan…',['QE51N','QA11','QS21','QP01'],0,'QE51N.'],
+['Usage decision memindahkan stok QI ke…',['Unrestricted, blocked, atau scrap sesuai keputusan','Vendor otomatis','Cost center','Sales order'],0,'Stock posting.'],
+['Keluhan customer dicatat sebagai notification tipe…',['Q1','Q2','Q3','M1'],0,'Q1.']
+])},
+
+{id:'pm',code:'PM',cat:'log',title:'PM – Plant Maintenance',dur:'35 mnt',
+sum:'Functional location, equipment, notification, work order, dan preventive maintenance.',tcs:['IE03','IW21','IW31','IW41','IP10'],
+objs:['Memahami struktur objek teknis','Menjalankan corrective maintenance dari notification sampai TECO','Mengatur preventive maintenance plan'],
+note:'Tulis satu mesin kritis di plant-mu dan jadwal perawatan preventifnya.',
+lessons:[
+L('Objek teknis',{p:['<b>Functional location</b> (IL01) adalah posisi di plant, misalnya PLANT1-LINE3-CONV. <b>Equipment</b> (IE01) adalah mesin fisik yang dipasang di posisi itu dan bisa dipindah. Equipment punya data pabrikan, nomor seri, cost center, dan bisa terhubung ke aset FI-AA.','<b>Measuring point</b> (IK01) mencatat pembacaan seperti jam operasi atau suhu, yang bisa memicu perawatan berbasis kondisi.'],
+tc:[['IL01 / IL03','Functional location'],['IE01 / IE03','Equipment'],['IK01 / IK11','Measuring point / measurement document'],['IH01','Struktur objek teknis']],
+keys:['Functional location = posisi, equipment = mesin fisik','Equipment bisa dipindah antar lokasi','Measuring point untuk perawatan berbasis kondisi'],
+cp:['Motor conveyor dicopot dan dipasang di line lain. Objek mana yang berpindah?',['Equipment','Functional location','Plant','Cost element'],0,'Equipment dipasang/dilepas dari functional location.']}),
+L('Corrective maintenance',{p:['Masalah dilaporkan dengan <b>notification</b> (IW21): M2 untuk kerusakan, M1 untuk permintaan perawatan. Planner mengubahnya menjadi <b>maintenance order</b> (IW31, misalnya PM01) dengan operasi, tenaga kerja, dan komponen sparepart.','Komponen stok membuat reservasi dan diambil dengan GI 261. Teknisi melapor dengan <b>konfirmasi</b> (IW41). Setelah selesai, order di-<b>TECO</b> dan biaya di-settle ke cost center pemilik mesin.'],
+flow:[['IW21','notification'],['IW31','order'],['Release','REL'],['GI 261','sparepart'],['IW41','konfirmasi'],['TECO','settle biaya']],
+tc:[['IW21 / IW28','Membuat / daftar notification'],['IW31 / IW32 / IW33','Membuat / mengubah / menampilkan order'],['IW41','Konfirmasi waktu kerja'],['IW38 / IW39','Daftar order (change/display)']],
+integ:'Sparepart diambil dari MM (reservasi, GI 261), jasa luar lewat PR/PO, dan biaya order di-settle ke CO. Order yang tidak di-TECO membuat biaya menggantung.',
+keys:['Notification → order → release → GI → konfirmasi → TECO','GI sparepart ke order memakai 261','Settle biaya ke cost center pemilik mesin'],
+cp:['Teknisi butuh bearing dari gudang untuk order perbaikan 4000123. Movement type?',['261','201','221','101'],0,'GI ke order = 261.']}),
+L('Preventive maintenance',{p:['<b>Maintenance plan</b> (IP41 untuk single cycle) menjadwalkan pekerjaan rutin, misalnya pelumasan setiap 30 hari atau ganti belt setiap 2.000 jam operasi. Isi pekerjaan diambil dari <b>task list</b> (IA05).','<b>IP10</b> menjadwalkan plan pertama kali. Setelah itu <b>IP30</b> (deadline monitoring, biasanya background job) otomatis membuat order sesuai jadwal.'],
+tc:[['IA05 / IA01','Task list general / equipment'],['IP41 / IP42','Maintenance plan single / strategy'],['IP10','Penjadwalan plan'],['IP30','Deadline monitoring'],['IP24','Overview jadwal']],
+keys:['Task list = isi pekerjaan','Maintenance plan = kapan dikerjakan','IP10 untuk mulai, IP30 untuk otomatis'],
+cp:['Plan pelumasan sudah dibuat tapi tidak pernah muncul order. Kemungkinan besar…',['Plan belum dijadwalkan (IP10) atau IP30 tidak berjalan','Equipment salah warna','Customer belum bayar','BOM kosong'],0,'Plan harus dijadwalkan agar membuat order.']})
+],
+quiz:QZ([
+['Laporan kerusakan mesin dibuat dengan…',['IW21','IW31','IP10','IE01'],0,'IW21.'],
+['Konfirmasi pekerjaan maintenance?',['IW41','CO11N','QA11','VL02N'],0,'IW41.'],
+['Mesin fisik yang bisa dipindah dicatat sebagai…',['Equipment','Functional location','Work center','Storage bin'],0,'Equipment.'],
+['Penjadwalan pertama maintenance plan?',['IP10','IP41','IA05','IW38'],0,'IP10.'],
+['Daftar maintenance order untuk dimonitor?',['IW38 / IW39','ME2N','MB51','FBL5N'],0,'IW38/IW39.']
+])},
+
+{id:'wm',code:'WM/EWM',cat:'log',title:'WM / EWM – Warehouse Management',dur:'35 mnt',
+sum:'Storage type, bin, transfer order, warehouse task, dan monitor gudang.',tcs:['LS03N','LT01','LT12','LX02','/SCWM/MON'],
+objs:['Memahami struktur gudang: warehouse number, storage type, bin','Membuat dan mengonfirmasi transfer order (WM)','Mengenal proses EWM: warehouse task, warehouse order, monitor'],
+note:'Gambar sketsa gudangmu: storage type dan contoh nama bin.',
+lessons:[
+L('Struktur gudang',{p:['IM (MIGO, MB52) tahu stok di level <b>storage location</b>. WM/EWM menambah detail sampai <b>storage bin</b> (rak/posisi). Strukturnya: <b>warehouse number</b> → <b>storage type</b> (misalnya rak tinggi, bulk, area staging) → storage section → <b>bin</b>. Stok di satu bin disebut <b>quant</b>.','Classic WM (LE-WM) ada di ECC dan masih bisa dipakai sementara di S/4HANA sebagai compatibility. Arah SAP sekarang adalah <b>EWM</b>, baik embedded di S/4HANA maupun decentralized.'],
+tc:[['LS01N / LS03N','Membuat / menampilkan storage bin'],['LX02','Stok per bin (WM)'],['LS26','Stok per material di gudang'],['/SCWM/MON','Warehouse monitor EWM']],
+keys:['Sloc (IM) vs bin (WM/EWM)','Warehouse number → storage type → bin','Quant = stok di satu bin'],
+cp:['MB52 menunjukkan 100 karton di sloc 1001, tetapi picker tidak tahu raknya. Data apa yang dibutuhkan?',['Stok per bin dari WM/EWM (misalnya LX02)','Data vendor','Billing','Cost center'],0,'Lokasi rak ada di level bin.']}),
+L('Transfer order (WM)',{p:['Setiap perpindahan fisik di WM dieksekusi dengan <b>transfer order (TO)</b>. GR dari MIGO membuat <b>transfer requirement</b> untuk putaway; delivery penjualan membutuhkan TO untuk picking (LT03).','TO menentukan bin asal dan tujuan sesuai strategi (misalnya putaway ke bin kosong terdekat, picking FIFO). Setelah barang benar-benar dipindah, TO harus <b>dikonfirmasi</b> (LT12). TO yang belum dikonfirmasi membuat stok di sistem dan fisik berbeda.'],
+flow:[['GR / delivery','TR atau kebutuhan'],['LT01 / LT03','buat TO'],['Pindah fisik','scan bin'],['LT12','konfirmasi']],
+tc:[['LT01','Membuat transfer order manual'],['LT03','TO untuk outbound delivery'],['LT12','Konfirmasi TO'],['LB10','Daftar transfer requirement'],['LT22 / LT23','Daftar TO']],
+keys:['Semua perpindahan bin lewat TO','Putaway dan picking mengikuti strategi','TO harus dikonfirmasi'],
+cp:['Barang sudah dipindah ke rak, tetapi sistem masih menunjukkan stok di area penerimaan. Kemungkinan…',['TO belum dikonfirmasi (LT12)','PO belum dibuat','Billing belum jalan','Material dihapus'],0,'Konfirmasi TO memperbarui posisi stok.']}),
+L('Proses EWM',{p:['Di EWM, unit kerjanya adalah <b>warehouse task</b> (WT), dikelompokkan menjadi <b>warehouse order</b> untuk satu operator. Dokumen masuk/keluar adalah <b>inbound/outbound delivery</b> EWM. Operator bekerja dengan perangkat RF (scanner) lewat <b>/SCWM/RFUI</b>.','<b>Warehouse monitor</b> (/SCWM/MON) adalah pusat kontrol: WT terbuka, wave, stok per bin, dan pengecualian. Fitur lanjutan: wave management, slotting, labor management, dan yard management.'],
+flow:[['Inbound delivery','/SCWM/PRDI'],['Unloading & GR',''],['Putaway WT','RF scanner'],['Outbound','/SCWM/PRDO'],['Wave & picking WT',''],['Loading & GI','']],
+tc:[['/SCWM/MON','Warehouse monitor'],['/SCWM/PRDI','Inbound delivery'],['/SCWM/PRDO','Outbound delivery'],['/SCWM/RFUI','Layar RF untuk operator'],['/SCWM/PI_PROCESS','Physical inventory EWM']],
+keys:['WT = tugas pindah, WO = paket tugas operator','/SCWM/MON pusat kontrol gudang','Operator memakai RF (/SCWM/RFUI)'],
+cp:['Supervisor gudang ingin melihat semua warehouse task yang belum selesai pagi ini. Tempat paling tepat?',['Warehouse monitor /SCWM/MON','MB52','VA05','KSB1'],0,'Monitor EWM menampilkan WT terbuka.']})
+],
+quiz:QZ([
+['Level lokasi paling detail di WM/EWM?',['Storage bin','Storage location','Plant','Company code'],0,'Bin.'],
+['Konfirmasi transfer order WM?',['LT12','LT01','LX02','MIGO'],0,'LT12.'],
+['Pusat kontrol EWM?',['/SCWM/MON','MD04','ME2N','F110'],0,'/SCWM/MON.'],
+['Di EWM, tugas memindahkan barang disebut…',['Warehouse task','Purchase order','Inspection lot','Billing'],0,'Warehouse task.'],
+['Stok per bin di classic WM dilihat dengan…',['LX02','MB52','FBL1N','CS03'],0,'LX02.']
+])},
+
+{id:'le',code:'LE',cat:'log',title:'LE – Logistics Execution: Shipping & Transport',dur:'30 mnt',
+sum:'Outbound dan inbound delivery, picking, packing, PGI, shipment, dan biaya angkut.',tcs:['VL10','VL01N','VL06O','VL31N','VT01N'],
+objs:['Memproses outbound delivery secara kolektif','Mengelola inbound delivery dari vendor','Membuat shipment dan menghitung biaya angkut'],
+note:'Tulis alur pengiriman dari gudangmu ke customer terbesar, termasuk siapa yang membuat dokumen.',
+lessons:[
+L('Shipping: outbound delivery',{p:['Delivery dibuat per <b>shipping point</b>. Untuk volume tinggi, gunakan <b>VL10</b> (delivery due list) untuk membuat banyak delivery sekaligus dari order yang jatuh tempo.','Langkah setelahnya: <b>picking</b> (qty dipilih, lewat WM/EWM jika ada), <b>packing</b> ke handling unit (HU) seperti karton/palet, lalu <b>PGI</b>. Monitor VL06O membantu melihat delivery yang belum picking, belum PGI, atau belum ditagih.'],
+flow:[['VL10','buat delivery kolektif'],['Picking','qty picked'],['Packing','HU'],['PGI','601'],['VL06O','monitor']],
+tc:[['VL10','Delivery due list'],['VL01N / VL02N','Delivery tunggal / ubah + PGI'],['VL06O','Outbound delivery monitor'],['HU02','Handling unit']],
+keys:['Delivery per shipping point','VL10 untuk proses kolektif','Picking → packing → PGI'],
+cp:['Gudang ingin membuat delivery untuk 120 sales order yang jatuh tempo hari ini sekaligus. Transaksi yang tepat?',['VL10 (delivery due list)','VA01','VF01','MIGO'],0,'VL10 memproses delivery secara kolektif.']}),
+L('Inbound delivery',{p:['Untuk vendor besar atau impor, perusahaan memakai <b>inbound delivery</b> (VL31N) sebagai pemberitahuan pengiriman (ASN) berdasarkan PO. Dengan dokumen ini gudang tahu barang apa yang akan datang dan kapan.','Saat barang tiba, GR diposting terhadap inbound delivery (VL32N atau MIGO dengan referensi inbound delivery). Jika ada WM/EWM, putaway mengikuti inbound delivery.'],
+tc:[['VL31N / VL32N','Membuat / mengubah inbound delivery'],['VL06I','Inbound delivery monitor'],['MIGO','GR dengan referensi inbound delivery']],
+integ:'Inbound delivery terhubung ke PO (MM) dan, jika vendor memakai Ariba Network, bisa dibuat otomatis dari ship notice vendor.',
+keys:['Inbound delivery = pemberitahuan barang datang','GR terhadap inbound delivery','Monitor dengan VL06I'],
+cp:['Kontainer impor dijadwalkan datang minggu depan. Dokumen yang membantu gudang menyiapkan tempat dan tenaga?',['Inbound delivery (VL31N) berdasarkan PO','Billing','Credit memo','Production order'],0,'Inbound delivery memberi visibilitas kedatangan.']}),
+L('Transportation',{p:['<b>Shipment</b> (VT01N) mengelompokkan beberapa delivery dalam satu truk/rute, mencatat forwarding agent, waktu loading, dan status perjalanan.','<b>Shipment cost</b> (VI01) menghitung biaya angkut dari tarif, lalu biaya diteruskan ke FI/MM untuk pembayaran ke transporter. Di S/4HANA, perencanaan transport yang lebih kompleks memakai <b>SAP TM</b> (freight order, optimasi rute).'],
+tc:[['VT01N / VT02N','Membuat / mengubah shipment'],['VT11','Daftar shipment'],['VI01','Shipment cost'],['Freight Order (TM)','Dokumen transport di SAP TM']],
+keys:['Shipment = beberapa delivery dalam satu angkutan','Shipment cost untuk biaya angkut','SAP TM untuk perencanaan transport lanjutan'],
+cp:['Satu truk membawa 6 delivery ke 6 toko. Dokumen yang menyatukan keenam delivery ini?',['Shipment (VT01N)','Sales order','Billing','Inspection lot'],0,'Shipment.']})
+],
+quiz:QZ([
+['Membuat banyak delivery sekaligus dari order jatuh tempo?',['VL10','VL31N','VT01N','VF04'],0,'VL10.'],
+['Inbound delivery dibuat dengan…',['VL31N','VL01N','VA01','ME21N'],0,'VL31N.'],
+['Dokumen yang menyatukan beberapa delivery dalam satu truk?',['Shipment','Handling unit','Billing','PIR'],0,'Shipment.'],
+['Biaya angkut dihitung dengan…',['VI01','F110','KO88','MIRO'],0,'Shipment cost.'],
+['Monitor outbound delivery?',['VL06O','VL06I','MD04','QA32'],0,'VL06O.']
+])},
+
+{id:'cs',code:'CS',cat:'log',title:'CS – Customer Service',dur:'30 mnt',
+sum:'Installed base, kontrak servis, service notification, service order, dan repair.',tcs:['IQ03','VA41','IW51','IW31','DP90'],
+objs:['Memahami installed base dan kontrak servis','Memproses servis lapangan dari notification sampai billing','Memproses repair barang customer'],
+note:'Tulis jenis layanan purna jual di perusahaanmu: garansi, kontrak, atau berbayar per kunjungan.',
+lessons:[
+L('Installed base dan kontrak',{p:['CS memakai objek PM untuk barang yang ada di tempat customer: <b>equipment</b> dengan data customer dan garansi, serta <b>serial number</b> (IQ01/IQ03).','<b>Service contract</b> (VA41) mencatat layanan yang dijual (misalnya perawatan 4 kali setahun), periode, harga, dan objek yang dicakup. Kontrak menentukan apakah servis ditagih atau gratis.'],
+tc:[['IQ01 / IQ03','Serial number'],['IE03','Equipment dengan data customer'],['VA41 / VA43','Membuat / menampilkan service contract'],['BGM1','Master warranty']],
+keys:['Equipment + serial number = installed base','Service contract mengatur cakupan dan harga','Garansi menentukan biaya ditagih atau tidak'],
+cp:['Customer menelepon minta perbaikan mesin. Data pertama yang dicek untuk menentukan perlu ditagih atau tidak?',['Garansi dan service contract untuk equipment/serial number tersebut','Saldo bank','Harga beli material','BOM produksi'],0,'Garansi dan kontrak menentukan penagihan.']}),
+L('Servis lapangan',{p:['Keluhan dicatat sebagai <b>service notification</b> (IW51, misalnya S1). Teknisi dijadwalkan lewat <b>service order</b> (IW31, misalnya SM01/SM02) yang berisi pekerjaan, sparepart, dan waktu.','Setelah konfirmasi, biaya order bisa ditagihkan dengan <b>resource-related billing</b> (DP90): SAP membuat permintaan billing dari jam kerja dan material yang dipakai, lalu billing SD (VF01).'],
+flow:[['IW51','notification'],['IW31','service order'],['Kerjakan','sparepart + jam'],['IW41','konfirmasi'],['DP90','billing request'],['VF01','invoice']],
+tc:[['IW51 / IW52','Service notification'],['IW31','Service order'],['IW41','Konfirmasi'],['DP90','Resource-related billing']],
+keys:['Notification → service order → konfirmasi → billing','DP90 menagih berdasarkan biaya aktual','Integrasi kuat dengan PM, MM, SD'],
+cp:['Servis selesai dengan 3 jam kerja dan 2 sparepart. Agar customer ditagih sesuai pemakaian aktual, gunakan…',['Resource-related billing (DP90) lalu billing','FB60','MIRO','KO88 ke cost center'],0,'DP90 mengubah biaya aktual menjadi tagihan.']}),
+L('Repair barang customer',{p:['Untuk barang yang dikirim customer ke bengkel, dibuat <b>repair order</b> di SD (order type untuk repair, misalnya RAS). Barang diterima dengan returns delivery, diperiksa, lalu diputuskan: perbaiki, ganti, atau kembalikan.','Service order untuk perbaikan dibuat otomatis dari repair order. Setelah selesai, barang dikirim balik dan ditagih sesuai hasil pemeriksaan dan garansi.'],
+tc:[['VA01 (repair order)','Order repair di SD'],['VL01N','Pengiriman kembali ke customer'],['IW33','Service order perbaikan']],
+keys:['Repair order di SD','Terima → periksa → perbaiki → kirim balik → tagih','Garansi memengaruhi tagihan'],
+cp:['Pompa customer dikirim ke bengkel untuk diperbaiki. Dokumen pembuka proses ini?',['Repair order di SD','Purchase order','Production order','Asset master'],0,'Repair order memulai alur repair.']})
+],
+quiz:QZ([
+['Service contract dibuat dengan…',['VA41','VA01','ME31K','IW21'],0,'VA41.'],
+['Service notification untuk keluhan customer?',['IW51','QM01','IW21','VL31N'],0,'IW51.'],
+['Penagihan berdasarkan jam dan material aktual?',['DP90','VF11','F110','CK24'],0,'DP90.'],
+['Installed base di CS terdiri dari…',['Equipment dan serial number di lokasi customer','Cost center','Vendor','Bin gudang'],0,'Installed base.'],
+['Barang customer yang diperbaiki di bengkel diawali dengan…',['Repair order','PIR','Inbound delivery vendor','Asset transfer'],0,'Repair order.']
+])},
+
+{id:'lo',code:'LO',cat:'log',title:'LO – Logistics General',dur:'30 mnt',
+sum:'Material master, batch management, klasifikasi, variant configuration, dan laporan logistik.',tcs:['MM01','MM03','MSC3N','CL02','MC.9'],
+objs:['Membuat dan membaca material master dengan view yang tepat','Mengelola batch dan klasifikasi','Mengenal variant configuration dan laporan LIS'],
+note:'Tulis material type yang paling sering kamu temui dan view apa yang wajib diisi.',
+lessons:[
+L('Material master',{p:['Material master dipakai semua modul logistik. Datanya tersusun dalam <b>view</b> per level organisasi: Basic Data (client), Sales (sales org), Purchasing dan MRP (plant), Storage (plant/sloc), Accounting (valuation area).','<b>Material type</b> menentukan view dan perilaku: ROH bahan baku, HALB setengah jadi, FERT barang jadi, HAWA barang dagang, ERSA sparepart, NLAG non-stock. Salah material type sering berarti salah akun G/L saat posting.'],
+tc:[['MM01 / MM02 / MM03','Membuat / mengubah / menampilkan material'],['MM60','Daftar material'],['MM17','Mass maintenance material'],['MMBE','Stok overview']],
+keys:['View per level organisasi','Material type mengatur view dan akun','Data master yang rapi = proses lancar'],
+cp:['Tim sales tidak bisa membuat order untuk material baru, padahal material sudah ada. Penyebab yang paling mungkin?',['View Sales untuk sales org/channel tersebut belum dibuat','Material type salah warna','Vendor belum dibuat','Periode tertutup'],0,'Sales order butuh view Sales di sales area terkait.']}),
+L('Batch dan klasifikasi',{p:['<b>Batch</b> mengelompokkan stok dengan sifat sama, misalnya tanggal produksi dan kedaluwarsa. Wajib untuk makanan, farmasi, dan kimia agar bisa ditelusuri (traceability) dan dipakai FEFO.','Sifat batch dicatat lewat <b>klasifikasi</b>: characteristic (CT04) dikumpulkan dalam class (CL02), lalu nilainya diisi per batch. <b>Batch where-used</b> (MB56) menunjukkan ke mana saja batch bahan baku dipakai, penting saat recall.'],
+tc:[['MSC1N / MSC3N','Membuat / menampilkan batch'],['CT04','Characteristic'],['CL02','Class'],['MB56','Batch where-used list'],['VB(','Shelf-life list (stok mendekati kedaluwarsa)']],
+keys:['Batch = traceability + FEFO','Characteristic → class → nilai per batch','MB56 untuk recall'],
+cp:['Ada keluhan kontaminasi pada satu batch gula. Kamu harus tahu produk jadi mana saja yang memakai batch itu. Laporan yang tepat?',['Batch where-used (MB56)','MB52','FBL5N','KSB1'],0,'MB56 menelusuri pemakaian batch.']}),
+L('Variant configuration dan laporan logistik',{p:['<b>Variant configuration</b> dipakai untuk produk dengan banyak pilihan (misalnya mesin dengan pilihan voltase dan warna). Satu material configurable dengan super BOM dan aturan (dependencies) menggantikan ratusan nomor material.','<b>LIS</b> (Logistics Information System) menyediakan analisis standar: stok (MC.9), pembelian (MCE1), penjualan (MCTA). Di S/4HANA, banyak analisis pindah ke app Fiori analitik berbasis CDS.'],
+tc:[['CU41','Configuration profile'],['CU50','Simulasi konfigurasi'],['MC.9','Analisis stok per plant/material'],['MCTA','Analisis penjualan per customer']],
+keys:['Variant configuration: satu material, banyak pilihan','LIS untuk analisis logistik standar','S/4: analitik Fiori berbasis CDS'],
+cp:['Perusahaan menjual 300 kombinasi conveyor (panjang, lebar, motor). Pendekatan master data yang efisien?',['Variant configuration dengan satu material configurable','300 material terpisah','Satu material tanpa pilihan','Pakai teks bebas di sales order'],0,'Variant configuration menghindari ledakan nomor material.']})
+],
+quiz:QZ([
+['Material type untuk barang jadi?',['FERT','ROH','ERSA','HAWA'],0,'FERT.'],
+['Laporan untuk recall batch?',['MB56','MM60','CU50','VL10'],0,'MB56.'],
+['Characteristic dibuat dengan…',['CT04','CL02','MSC1N','MM01'],0,'CT04.'],
+['View Purchasing dan MRP berada di level…',['Plant','Client','Sales org','Company code'],0,'Plant.'],
+['Produk dengan banyak kombinasi pilihan dikelola dengan…',['Variant configuration','Batch','Profit center','Dunning'],0,'Variant configuration.']
+])},
+
+{id:'hcm',code:'HCM',cat:'hr',title:'HCM – Human Capital Management',dur:'40 mnt',
+sum:'Organizational management, personnel administration, time management, dan payroll.',tcs:['PPOME','PA40','PA30','PA61','PA03'],
+objs:['Membaca struktur organisasi (org unit, position, job)','Mengelola data karyawan dengan infotype','Mencatat data waktu dan absensi','Memahami siklus payroll sampai posting ke FI'],
+note:'Tulis infotype yang paling sering kamu ubah dan dokumen pendukung yang diminta.',
+lessons:[
+L('Organizational management',{p:['Struktur organisasi terdiri dari <b>organizational unit</b> (departemen), <b>position</b> (kursi, misalnya Staff Admin Proyek 1), dan <b>job</b> (deskripsi umum, misalnya Staff Admin). Karyawan (person) menduduki position; position melapor ke position atasan.','Relasi ini dipakai untuk alur approval (cuti, PR, workflow), pelaporan headcount, dan penentuan cost center gaji.'],
+tc:[['PPOCE','Membuat struktur organisasi'],['PPOME','Mengubah struktur organisasi'],['PPOSE','Menampilkan struktur'],['S_AHR_61016362','Laporan struktur organisasi']],
+keys:['Org unit → position → person','Job = deskripsi umum, position = kursi spesifik','Struktur dipakai untuk approval dan headcount'],
+cp:['Karyawan baru akan menggantikan staff yang resign di kursi yang sama. Objek mana yang tetap dan diisi orang baru?',['Position','Job','Org unit baru','Cost element'],0,'Position tetap, pemegangnya berganti.']}),
+L('Personnel administration dan infotype',{p:['Data karyawan disimpan dalam <b>infotype</b> bernomor dengan periode berlaku. Yang paling sering: 0000 Actions, 0001 Organizational Assignment, 0002 Personal Data, 0006 Address, 0007 Planned Working Time, 0008 Basic Pay, 0009 Bank Details.','Peristiwa seperti hiring, mutasi, promosi, dan terminasi dijalankan sebagai <b>personnel action</b> (PA40) yang membuka infotype terkait secara berurutan. Perubahan satuan dilakukan di PA30, dan tampilan di PA20.'],
+tc:[['PA40','Personnel action (hiring, mutasi, resign)'],['PA30','Maintain infotype'],['PA20','Display infotype'],['PA10','Personnel file']],
+tip:'Gunakan tanggal berlaku yang tepat. Mengubah record lama (Change) menimpa sejarah; untuk kenaikan gaji gunakan Copy dengan tanggal mulai baru agar riwayat tetap ada.',
+keys:['Infotype = blok data dengan periode berlaku','PA40 untuk peristiwa, PA30 untuk perubahan','Jaga riwayat dengan Copy + tanggal baru'],
+cp:['Gaji karyawan naik mulai 1 Januari. Cara yang benar di infotype 0008?',['Copy record dengan tanggal mulai 01.01 dan isi gaji baru','Change record lama sehingga gaji lama hilang','Hapus infotype 0008','Buat karyawan baru'],0,'Copy menjaga riwayat gaji.']}),
+L('Time management',{p:['Jadwal kerja karyawan ada di infotype 0007 (work schedule rule). Ketidakhadiran dicatat di <b>2001 Absences</b> (cuti, sakit), kehadiran khusus di <b>2002 Attendances</b> (dinas luar, training), dan lembur di 2005 atau lewat time evaluation.','Banyak perusahaan memakai <b>CATS</b> (CAT2) untuk timesheet, yang juga bisa membebankan jam kerja ke proyek (WBS) atau order. <b>Time evaluation</b> (PT60) menghitung saldo cuti, lembur, dan hasil waktu untuk payroll.'],
+tc:[['PA61','Maintain time data'],['PT50','Quota overview (saldo cuti)'],['CAT2','Timesheet CATS'],['PT60','Time evaluation']],
+integ:'Hasil time evaluation dibaca payroll. Timesheet CATS ke WBS/order juga mengalirkan biaya tenaga kerja ke PS dan CO.',
+keys:['0007 jadwal, 2001 absen, 2002 hadir khusus','CATS untuk timesheet ke proyek','Time evaluation menyiapkan data payroll'],
+cp:['Karyawan cuti tahunan 3 hari. Infotype yang dipakai?',['2001 Absences','0008 Basic Pay','0006 Address','0009 Bank Details'],0,'Cuti = absence.']}),
+L('Payroll',{p:['Payroll berjalan per <b>payroll area</b> (misalnya bulanan). Siklusnya dikendalikan <b>control record</b> (PA03): release payroll (data master terkunci), jalankan simulasi dan payroll run, cek hasil, koreksi bila perlu, lalu exit.','Setelah selesai: posting ke FI (beban gaji, hutang gaji, pajak, BPJS), file transfer bank, dan slip gaji. Nama T-code payroll memakai kode negara, misalnya PC00_Mxx_CALC, dengan xx sesuai country version.'],
+flow:[['PA03','release'],['Simulasi','cek error'],['Payroll run','PC00_Mxx_CALC'],['Cek hasil','koreksi'],['Exit','PA03'],['Posting FI','PC00_M99_CIPE'],['Bank & slip','transfer + slip']],
+tc:[['PA03','Control record payroll'],['PC00_Mxx_CALC','Payroll run (xx = kode negara)'],['PC00_Mxx_CEDT','Slip gaji'],['PC00_M99_CIPE','Posting run ke FI'],['PC_PAYRESULT','Menampilkan hasil payroll']],
+integ:'Posting payroll membuat jurnal FI ke akun beban per cost center (dari infotype 0001) dan hutang ke bank, kantor pajak, serta BPJS.',
+keys:['Control record mengunci periode: release → run → exit','Simulasi dulu sebelum run sebenarnya','Posting ke FI dan transfer bank setelah exit'],
+cp:['Setelah payroll di-release (PA03), HR ingin mengubah gaji pokok untuk periode yang sedang diproses. Apa yang terjadi?',['Perubahan untuk periode itu terkunci sampai status diubah ke correction','Bisa diubah bebas','Payroll terhapus','Karyawan otomatis terminasi'],0,'Release mengunci master data periode berjalan.']})
+],
+quiz:QZ([
+['Hiring karyawan baru dijalankan dengan…',['PA40','PA20','PPOSE','PA03'],0,'PA40.'],
+['Infotype gaji pokok?',['0008','0002','2001','0009'],0,'0008.'],
+['Timesheet ke proyek memakai…',['CATS (CAT2)','MIGO','VA01','IW31'],0,'CATS.'],
+['Control record payroll?',['PA03','PA30','PT60','PPOME'],0,'PA03.'],
+['Kursi spesifik dalam organisasi disebut…',['Position','Job','Payroll area','Infotype'],0,'Position.']
+])}
+];
+
+/* ===================== TEKNIS ===================== */
+const MODS_TECH=[
+{id:'basis',code:'BASIS',cat:'tech',title:'Basis – Administrasi Sistem SAP',dur:'35 mnt',
+sum:'Landscape, client, work process, user, background job, monitoring, dan transport.',tcs:['SU01','SM37','SM50','ST22','STMS'],
+objs:['Memahami landscape DEV-QAS-PRD dan konsep client','Mengelola user dan background job','Memantau kesehatan sistem','Mengelola transport dan pemeliharaan'],
+note:'Tulis checklist monitoring harian yang akan kamu jalankan setiap pagi.',
+lessons:[
+L('Arsitektur dan landscape',{p:['Landscape standar terdiri dari tiga sistem: <b>DEV</b> (development dan konfigurasi), <b>QAS</b> (testing), dan <b>PRD</b> (produksi). Perubahan berpindah lewat <b>transport</b>, tidak dikerjakan langsung di PRD.','Satu sistem punya beberapa <b>client</b> (misalnya 000, 100, 800) yang memisahkan data bisnis. Server aplikasi menjalankan <b>work process</b>: dialog (user online), background (job), update, spool (cetak), dan enqueue (lock). Database S/4HANA adalah SAP HANA.'],
+tc:[['SM50 / SM66','Work process lokal / global'],['SM51','Daftar application server'],['SCC4','Pengaturan client'],['DBACOCKPIT','Monitoring database']],
+keys:['DEV → QAS → PRD lewat transport','Client memisahkan data dalam satu sistem','Work process: dialog, background, update, spool, enqueue'],
+cp:['Konsultan ingin mengubah konfigurasi langsung di PRD karena "cuma sedikit". Prinsip yang benar?',['Ubah di DEV, uji di QAS, transport ke PRD','Langsung di PRD agar cepat','Ubah di QAS saja','Minta user mengubah sendiri'],0,'Jalur transport menjaga kontrol perubahan.']}),
+L('User, job, dan monitoring',{p:['User dibuat di <b>SU01</b> dan diberi role dari <b>PFCG</b>. Kunci/buka user, reset password, dan validitas user juga di SU01. Saat user mengeluh "tidak punya akses", minta mereka menjalankan <b>SU53</b> setelah error.','Proses berat dijalankan sebagai <b>background job</b> (SM36) dan dipantau di <b>SM37</b>. Monitoring harian: job gagal (SM37), short dump (ST22), system log (SM21), update terhenti (SM13), lock menggantung (SM12), dan spool (SP01).'],
+tc:[['SU01','User maintenance'],['SM36 / SM37','Definisi / monitor background job'],['ST22','ABAP runtime error (dump)'],['SM21','System log'],['SM12 / SM13','Lock entries / update requests'],['ST03N','Workload analysis']],
+tip:'Jangan menghapus lock di SM12 tanpa memastikan user pemiliknya sudah tidak bekerja. Lock yang dihapus saat transaksi berjalan bisa membuat data tidak konsisten.',
+keys:['SU01 user, PFCG role, SU53 cek otorisasi','SM37 untuk job, ST22 untuk dump','Checklist harian: SM37, ST22, SM21, SM13, SM12'],
+cp:['Laporan stok mingguan otomatis tidak terkirim pagi ini. Tempat pertama yang dicek?',['SM37 untuk status background job','MB52','SU01','VA05'],0,'Job terjadwal dipantau di SM37.']}),
+L('Transport dan pemeliharaan',{p:['Perubahan dikumpulkan dalam <b>transport request</b> (SE09/SE10): workbench (objek repository/ABAP) dan customizing (konfigurasi). Request di-release lalu di-import ke QAS dan PRD lewat <b>STMS</b> sesuai jadwal dan approval.','Pemeliharaan rutin: support package (SPAM/SAINT), update kernel, system refresh QAS dari PRD, backup dan restore, serta pengujian setelah upgrade.'],
+flow:[['SE09/SE10','buat & release request'],['STMS','import ke QAS'],['Uji','user acceptance'],['Approval','change board'],['STMS','import ke PRD']],
+tc:[['SE09 / SE10','Transport organizer'],['STMS','Transport management system'],['SPAM / SAINT','Support package / add-on'],['SE01','Transport organizer (extended)']],
+keys:['Workbench vs customizing request','Release → import QAS → uji → import PRD','Support package dan kernel diuji dulu di non-PRD'],
+cp:['Import ke PRD gagal karena objek bergantung pada request lain yang belum di-import. Pelajaran utamanya?',['Urutan dan dependensi transport harus dicek sebelum import','Import ulang terus sampai berhasil','Ubah langsung di PRD','Hapus request'],0,'Urutan transport penting.']})
+],
+quiz:QZ([
+['Monitor background job?',['SM37','SU01','ST22','SE38'],0,'SM37.'],
+['Short dump dilihat di…',['ST22','SM21','SM12','SPAM'],0,'ST22.'],
+['Transport antar sistem dikelola di…',['STMS','SCC4','PFCG','SM50'],0,'STMS.'],
+['User melaporkan error otorisasi. Transaksi yang diminta dijalankan user?',['SU53','SU01','ST03N','SM13'],0,'SU53.'],
+['Urutan landscape standar?',['DEV → QAS → PRD','PRD → QAS → DEV','QAS → DEV → PRD','Hanya PRD'],0,'Tiga tingkat.']
+])},
+
+{id:'abap',code:'ABAP',cat:'tech',title:'ABAP – Pemrograman SAP',dur:'40 mnt',
+sum:'ABAP Workbench, Data Dictionary, laporan ALV, form, enhancement, BAPI, dan ABAP modern.',tcs:['SE80','SE11','SE38','SE37','SE18'],
+objs:['Mengenal alat ABAP Workbench dan ADT','Membuat laporan dengan selection screen dan ALV','Memahami form output','Memperluas standar SAP dengan aman'],
+note:'Tulis satu kebutuhan laporan di timmu yang bisa dibuat sebagai program ALV.',
+lessons:[
+L('Workbench dan Data Dictionary',{p:['Program ABAP dibuat di <b>SE38</b>/<b>SE80</b> atau di Eclipse dengan <b>ABAP Development Tools (ADT)</b>, yang menjadi standar untuk S/4HANA. <b>Data Dictionary</b> (SE11) mendefinisikan tabel, struktur, data element, dan domain.','Tabel standar yang sering dipakai: MARA (material), EKKO/EKPO (PO), VBAK/VBAP (sales order), BKPF/ACDOCA (akuntansi), MSEG/MATDOC (dokumen material).'],
+tc:[['SE38 / SE80','Editor program / object navigator'],['SE11','Data Dictionary'],['SE16N','Menampilkan isi tabel'],['SE37','Function module'],['SE24','Class builder']],
+keys:['ADT (Eclipse) untuk pengembangan modern','SE11 untuk tabel/struktur','Kenali tabel standar per modul'],
+cp:['Programmer ingin tahu struktur field tabel EKPO. Transaksi yang tepat?',['SE11','SM37','STMS','PA30'],0,'SE11 Data Dictionary.']}),
+L('Laporan dan form',{p:['Laporan klasik terdiri dari <b>selection screen</b> (PARAMETERS, SELECT-OPTIONS), pengambilan data dengan <b>Open SQL</b>, dan output <b>ALV</b> (misalnya CL_SALV_TABLE) yang memberi sort, filter, total, dan export otomatis.','Dokumen cetak (PO, invoice, surat jalan) dibuat dengan <b>SmartForms</b>, <b>Adobe Forms</b> (SFP), atau SAPscript (lama). Form dipanggil oleh output determination dokumen.'],
+tc:[['SE38','Program laporan'],['SMARTFORMS','SmartForms'],['SFP','Adobe Forms'],['NACE','Output determination (ECC)']],
+tip:'Ambil hanya field dan baris yang dibutuhkan (hindari SELECT *) dan jangan SELECT di dalam LOOP. Dua kesalahan ini penyebab utama laporan lambat.',
+keys:['Selection screen + Open SQL + ALV','Form: SmartForms / Adobe Forms','Performa: hindari SELECT * dan SELECT di LOOP'],
+cp:['Laporan custom sangat lambat. Kode berisi SELECT SINGLE di dalam LOOP 50.000 baris. Perbaikan utama?',['Ambil data sekaligus (FOR ALL ENTRIES / JOIN) di luar loop','Tambah RAM','Hapus ALV','Jalankan di QAS'],0,'Akses database di dalam loop sangat mahal.']}),
+L('Enhancement dan ABAP modern',{p:['Standar SAP tidak diubah langsung (modification). Logika tambahan dipasang lewat <b>enhancement</b>: user exit, customer exit, <b>BAdI</b> (SE18 definisi, SE19 implementasi), dan enhancement point. Integrasi program memakai <b>BAPI</b>, misalnya BAPI_PO_CREATE1.','Di S/4HANA, arah pengembangan adalah <b>clean core</b>: CDS view untuk model data, <b>RAP</b> (RESTful ABAP Programming) untuk aplikasi dan API, released API, serta pemeriksaan kode dengan ATC.'],
+tc:[['SE18 / SE19','BAdI definition / implementation'],['CMOD / SMOD','Customer exit (lama)'],['BAPI','BAPI explorer'],['ATC','ABAP Test Cockpit'],['/h','Mengaktifkan debugger']],
+keys:['Jangan modifikasi standar; gunakan enhancement','BAPI untuk integrasi','S/4: CDS + RAP + clean core'],
+cp:['User ingin validasi tambahan saat PO disimpan. Pendekatan yang benar?',['Implementasi BAdI/enhancement yang disediakan untuk PO','Mengubah kode standar SAP','Membuat tabel baru','Menonaktifkan validasi standar'],0,'Enhancement menjaga upgrade tetap aman.']})
+],
+quiz:QZ([
+['Data Dictionary?',['SE11','SE38','SM37','PFCG'],0,'SE11.'],
+['Output tabel interaktif dengan sort dan export di program ABAP?',['ALV','SAPscript','IDoc','BAdI'],0,'ALV.'],
+['Implementasi BAdI dibuat di…',['SE19','SE11','SE16N','STMS'],0,'SE19.'],
+['Model data modern di S/4HANA dibuat dengan…',['CDS view','SAPscript','Batch input','Customer exit'],0,'CDS.'],
+['BAPI dipakai untuk…',['Memanggil fungsi bisnis SAP secara terstandar dari program lain','Mencetak form','Monitoring job','Mengatur client'],0,'BAPI = API bisnis.']
+])},
+
+{id:'fiori',code:'FIORI',cat:'tech',title:'Fiori / UI5',dur:'30 mnt',
+sum:'Fiori launchpad, jenis app, katalog dan role, OData, serta pengembangan SAPUI5 dan Fiori elements.',tcs:['/UI2/FLP','/IWFND/MAINT_SERVICE','/IWFND/ERROR_LOG'],
+objs:['Mengenal Fiori launchpad dan jenis app','Mengatur akses app lewat katalog dan role','Memahami dasar pengembangan SAPUI5 dan Fiori elements'],
+note:'Tulis tiga transaksi GUI di timmu yang punya padanan app Fiori.',
+lessons:[
+L('Fiori launchpad',{p:['<b>Fiori launchpad</b> adalah halaman awal berbasis browser berisi <b>tile</b> app. Isinya diatur dengan <b>spaces & pages</b> (sebelumnya groups) sesuai role user.','Jenis app: <b>transactional</b> (membuat/mengubah, misalnya Manage Purchase Orders), <b>analytical</b> (KPI dan grafik), dan <b>fact sheet</b> (ringkasan objek). Banyak T-code GUI tetap bisa dibuka dari launchpad sebagai app GUI for HTML.'],
+tc:[['/UI2/FLP','Membuka Fiori launchpad'],['Fiori Apps Reference Library','Katalog resmi app Fiori dan padanan T-code-nya'],['/UI2/FLPD_CUST','Launchpad designer (lama)']],
+keys:['Launchpad = tile sesuai role','Transactional, analytical, fact sheet','Fiori Apps Reference Library untuk mencari app'],
+cp:['User ingin tahu app Fiori pengganti ME23N. Sumber yang paling tepat?',['Fiori Apps Reference Library','SM37','SE11','ST22'],0,'Library memetakan app ke T-code.']}),
+L('Akses app: katalog, role, OData',{p:['App tampil jika user punya <b>business catalog</b> lewat role PFCG (di S/4: business role). Katalog berisi app; role memberi otorisasi data di backend.','Hampir semua app berbicara dengan backend lewat <b>OData service</b>. Service harus diaktifkan di <b>/IWFND/MAINT_SERVICE</b>. Error saat app dibuka sering terlihat di <b>/IWFND/ERROR_LOG</b>.'],
+tc:[['PFCG','Role dengan katalog Fiori'],['/IWFND/MAINT_SERVICE','Aktivasi OData service'],['/IWFND/ERROR_LOG','Log error gateway'],['/UI2/FLIA','Fiori launchpad intent analysis']],
+keys:['Katalog di role menentukan tile','OData service harus aktif','Cek error di /IWFND/ERROR_LOG'],
+cp:['Tile muncul tetapi app menampilkan error saat dibuka. Langkah cek yang masuk akal?',['Cek /IWFND/ERROR_LOG dan status OData service','Hapus user','Import transport acak','Restart PC user'],0,'Error app biasanya dari service atau otorisasi backend.']}),
+L('Pengembangan SAPUI5 dan Fiori elements',{p:['<b>SAPUI5</b> adalah framework JavaScript SAP dengan pola MVC (view XML, controller JS, model OData/JSON). Developer bekerja di <b>SAP Business Application Studio</b> atau VS Code dengan Fiori tools.','<b>Fiori elements</b> menghasilkan app standar (List Report, Object Page, Overview Page) dari anotasi CDS tanpa banyak kode UI, sehingga konsisten dan mudah dipelihara.'],
+tc:[['Business Application Studio','IDE cloud untuk Fiori/UI5'],['Fiori tools','Generator dan preview app'],['SE80 / ADT','Repository BSP untuk deploy app ke ABAP']],
+keys:['SAPUI5: MVC + OData','Fiori elements dari anotasi CDS','BAS / Fiori tools untuk pengembangan'],
+cp:['Tim butuh app daftar dokumen dengan filter dan halaman detail standar secepatnya. Pendekatan yang efisien?',['Fiori elements List Report + Object Page dari CDS beranotasi','Menulis SAPUI5 dari nol','Membuat SAPscript','Program batch input'],0,'Fiori elements mempercepat app standar.']})
+],
+quiz:QZ([
+['Aktivasi OData service?',['/IWFND/MAINT_SERVICE','SE11','SM37','STMS'],0,'Gateway service maintenance.'],
+['Tile Fiori yang tampil ditentukan oleh…',['Katalog di role user','Warna browser','Client','Kernel'],0,'Role dan katalog.'],
+['Jenis app untuk KPI dan grafik?',['Analytical','Transactional','Fact sheet','Batch'],0,'Analytical.'],
+['App standar dari anotasi CDS dibuat dengan…',['Fiori elements','SAPscript','LSMW','IDoc'],0,'Fiori elements.'],
+['Log error gateway?',['/IWFND/ERROR_LOG','ST22 saja','SM12','SU01'],0,'/IWFND/ERROR_LOG.']
+])},
+
+{id:'grc',code:'GRC',cat:'tech',title:'Security & GRC',dur:'35 mnt',
+sum:'Konsep otorisasi, role PFCG, segregation of duties, GRC Access Control, dan audit log.',tcs:['PFCG','SU53','SUIM','ST01','GRAC_SPM'],
+objs:['Memahami authorization object dan role','Menganalisis masalah otorisasi','Memahami SoD dan GRC Access Control','Mendukung audit keamanan'],
+note:'Tulis dua kombinasi akses di perusahaanmu yang berisiko jika dipegang satu orang.',
+lessons:[
+L('Konsep otorisasi',{p:['Akses dikendalikan oleh <b>authorization object</b> dengan field, misalnya M_BEST_BSA (document type PO, aktivitas create/change/display). Nilai object dikumpulkan dalam <b>role</b> (PFCG) yang menghasilkan profile, lalu role diberikan ke user.','Jenis role: single, composite (gabungan), dan derived (turunan dengan nilai organisasi berbeda, misalnya per plant). Prinsipnya <b>least privilege</b>: user hanya mendapat akses yang dibutuhkan pekerjaannya.'],
+tc:[['PFCG','Role maintenance'],['SU24','Default object per transaksi'],['SU53','Pemeriksaan otorisasi terakhir yang gagal'],['ST01 / STAUTHTRACE','Authorization trace'],['SUIM','Laporan user, role, dan otorisasi']],
+keys:['Object → role → user','Derived role untuk variasi organisasi','Least privilege'],
+cp:['User di plant 1100 juga bisa membuat PO untuk plant 1200 padahal tidak boleh. Yang perlu diperbaiki?',['Nilai field plant di role (misalnya derived role per plant)','Password user','Kernel','Layout ALV'],0,'Nilai organisasi di role terlalu luas.']}),
+L('Segregation of duties dan GRC Access Control',{p:['<b>SoD</b> mencegah satu orang menguasai proses dari awal sampai akhir. Contoh risiko: membuat vendor + membayar vendor, membuat PO + memposting GR, mengubah master gaji + menjalankan payroll.','<b>GRC Access Control</b> membantu dengan Access Risk Analysis (cek konflik sebelum role diberikan), Access Request Management (permintaan akses dengan approval), Emergency Access Management (firefighter dengan log), dan Business Role Management.'],
+tc:[['GRAC_SPM','Emergency access (firefighter)'],['NWBC (GRC)','Akses ke modul GRC Access Control'],['Access Risk Analysis','Laporan konflik SoD per user/role']],
+keys:['SoD = pisahkan peran yang berisiko','Cek risiko sebelum memberi akses','Firefighter untuk akses darurat yang tercatat'],
+cp:['Seorang staff purchasing diminta juga memposting GR karena gudang kekurangan orang. Risikonya?',['Konflik SoD: satu orang bisa membuat PO dan mengakui penerimaan barang','Tidak ada risiko','Hanya masalah performa','Masalah lisensi saja'],0,'PO + GR oleh satu orang membuka peluang fraud.']}),
+L('Audit dan pemantauan keamanan',{p:['<b>Security audit log</b> mencatat aktivitas penting seperti login gagal, perubahan user, dan penggunaan transaksi kritis. Di S/4HANA dikonfigurasi dengan RSAU_CONFIG dan dibaca dengan RSAU_READ_LOG (sebelumnya SM19/SM20).','Kegiatan rutin: user access review berkala, penonaktifan user yang resign, review user dengan SAP_ALL, dan review log firefighter. GRC Process Control dan Risk Management membantu mendokumentasikan kontrol dan pengujiannya.'],
+tc:[['RSAU_CONFIG','Konfigurasi security audit log'],['RSAU_READ_LOG','Membaca audit log'],['SUIM','User dengan role/profil kritis'],['SU10','Mass user maintenance (lock/unlock)']],
+keys:['Audit log untuk aktivitas kritis','Access review berkala','User resign segera dikunci'],
+cp:['Auditor bertanya siapa saja yang punya profil SAP_ALL di PRD. Laporan yang tepat?',['SUIM (user berdasarkan profil)','MB52','FBL1N','SM37'],0,'SUIM menjawab pertanyaan akses.']})
+],
+quiz:QZ([
+['Role dibuat dan dikelola di…',['PFCG','SU53','SM37','SE11'],0,'PFCG.'],
+['Transaksi untuk melihat cek otorisasi yang gagal?',['SU53','SU01','STMS','ST22'],0,'SU53.'],
+['Contoh konflik SoD?',['Membuat vendor dan membayar vendor oleh orang yang sama','Melihat laporan stok','Login dua kali','Mengubah password'],0,'SoD klasik.'],
+['Akses darurat yang tercatat di GRC disebut…',['Firefighter / Emergency Access Management','Derived role','Client copy','Variant'],0,'EAM.'],
+['Laporan user dan otorisasi?',['SUIM','MD04','VA05','KSB1'],0,'SUIM.']
+])},
+
+{id:'bw',code:'BW/BI',cat:'tech',title:'BW / BI – Business Warehouse & Analytics',dur:'30 mnt',
+sum:'Ekstraksi data, model BW, process chain, query, Analysis for Office, SAC, dan embedded analytics.',tcs:['RSA1','RSPC','RSA3'],
+objs:['Memahami alur data dari sumber ke laporan','Membuat dan memakai query untuk analisis','Memantau load data dan process chain'],
+note:'Tulis satu KPI yang kamu pantau tiap bulan dan dari modul SAP mana datanya berasal.',
+lessons:[
+L('Konsep dan alur data',{p:['BW mengumpulkan data dari ERP dan sumber lain untuk analisis historis. Data diambil lewat <b>DataSource/extractor</b> (bisa diuji di RSA3 pada sistem sumber), diubah dengan <b>transformation</b>, dan dimuat oleh <b>DTP</b> ke objek seperti <b>aDSO</b>. Untuk pelaporan, beberapa objek digabung di <b>CompositeProvider</b>.','Platform saat ini: BW/4HANA (on-premise) dan <b>SAP Datasphere</b> (cloud). Untuk laporan operasional real-time, S/4HANA punya <b>embedded analytics</b> berbasis CDS tanpa perlu BW.'],
+flow:[['Sumber','S/4, file, cloud'],['DataSource','ekstraksi'],['Transformation','aturan'],['DTP','load'],['aDSO','penyimpanan'],['CompositeProvider','query']],
+tc:[['RSA1','Data Warehousing Workbench'],['RSA3','Extractor checker (di sistem sumber)'],['BW Modeling Tools','Pemodelan di Eclipse']],
+keys:['DataSource → transformation → DTP → aDSO','CompositeProvider untuk reporting','Embedded analytics untuk operasional real-time'],
+cp:['Manajer butuh tren penjualan 5 tahun digabung dengan data e-commerce eksternal. Platform yang lebih cocok?',['Data warehouse (BW/4HANA atau Datasphere)','Transaksi VA05','SE16N','MB52'],0,'Analisis historis lintas sumber = data warehouse.']}),
+L('Query dan visualisasi',{p:['<b>Query</b> (BW Query di Eclipse, dulu BEx Query Designer) mendefinisikan baris, kolom, filter, variabel, dan key figure terhitung. Satu query bisa dipakai di banyak front end.','Front end yang umum: <b>Analysis for Office</b> (add-in Excel untuk analisis pivot), <b>SAP Analytics Cloud</b> (dashboard, story, planning), dan app Fiori analitik untuk embedded analytics.'],
+tc:[['BW Query (Eclipse)','Mendesain query'],['Analysis for Office','Analisis query di Excel'],['SAP Analytics Cloud','Dashboard dan story'],['Query Browser','App Fiori untuk query CDS']],
+keys:['Query = definisi analisis yang bisa dipakai ulang','Analysis for Office untuk pengguna Excel','SAC untuk dashboard dan planning'],
+cp:['Tim finance terbiasa Excel dan ingin drill-down data BW dengan pivot. Alat yang paling cocok?',['Analysis for Office','SM37','SE38','FB50'],0,'Add-in Excel untuk query BW.']}),
+L('Operasional BW',{p:['Load data dijadwalkan dalam <b>process chain</b> (RSPC): ekstraksi, load, aktivasi, lalu refresh. Analis BI perlu memeriksa status chain setiap pagi, karena chain gagal berarti dashboard menampilkan data lama.','Prinsip kualitas data: rekonsiliasi angka BW dengan laporan sumber (misalnya total penjualan BW vs VA05/FI), tangani delta yang terlewat, dan dokumentasikan definisi KPI.'],
+tc:[['RSPC','Process chain maintenance & monitor'],['RSMO','Monitor load (lama)'],['RSRT','Uji eksekusi query']],
+keys:['Process chain gagal = data dashboard basi','Rekonsiliasi dengan sistem sumber','Definisi KPI terdokumentasi'],
+cp:['Dashboard penjualan pagi ini masih menampilkan angka kemarin lusa. Pengecekan pertama?',['Status process chain di RSPC','Password user','Material master','Kernel'],0,'Load yang gagal membuat data tidak terbarui.']})
+],
+quiz:QZ([
+['Monitor process chain?',['RSPC','RSA3','SM12','PA03'],0,'RSPC.'],
+['Menguji extractor di sistem sumber?',['RSA3','RSA1','RSRT','ST22'],0,'RSA3.'],
+['Add-in Excel untuk query BW?',['Analysis for Office','SmartForms','SAP GUI scripting','NACE'],0,'Analysis for Office.'],
+['Objek pelaporan yang menggabungkan beberapa provider?',['CompositeProvider','DataSource','Transport','Variant'],0,'CompositeProvider.'],
+['Laporan operasional real-time di S/4HANA tanpa BW memakai…',['Embedded analytics berbasis CDS','SAPscript','Batch input','IDoc'],0,'Embedded analytics.']
+])},
+
+{id:'pi',code:'PI/PO/CPI',cat:'tech',title:'PI/PO & Cloud Integration',dur:'30 mnt',
+sum:'IDoc, RFC, PI/PO, Integration Suite (CPI), iFlow, dan monitoring integrasi.',tcs:['WE02','BD87','SM59','SXMB_MONI'],
+objs:['Mengenal teknologi integrasi SAP','Memantau dan memproses ulang IDoc','Memahami PI/PO dan Cloud Integration'],
+note:'Gambar satu alur integrasi di perusahaanmu: sistem asal, middleware, sistem tujuan.',
+lessons:[
+L('IDoc dan RFC',{p:['<b>IDoc</b> adalah format dokumen elektronik SAP (misalnya ORDERS untuk PO, INVOIC untuk invoice, MATMAS untuk material). Status IDoc: hijau (53 berhasil diposting di inbound), merah (51 error aplikasi), dan lain-lain.','<b>RFC</b> menghubungkan sistem SAP secara langsung; tujuannya didefinisikan di SM59. Partner profile (WE20) mengatur IDoc apa yang dikirim/diterima dari partner mana.'],
+tc:[['WE02 / WE05','Monitor IDoc'],['BD87','Proses ulang IDoc'],['WE19','Test tool IDoc'],['WE20','Partner profile'],['SM59','RFC destination']],
+keys:['IDoc = dokumen elektronik terstandar','Status 51 = error aplikasi, 53 = sukses','BD87 untuk reprocess setelah data diperbaiki'],
+cp:['IDoc order dari customer berstatus 51 karena material tidak dikenal. Setelah material mapping diperbaiki, langkah berikutnya?',['Proses ulang IDoc dengan BD87','Hapus IDoc','Buat ulang customer','Restart server'],0,'Reprocess dengan BD87.']}),
+L('SAP PI/PO',{p:['<b>Process Integration / Process Orchestration</b> adalah middleware on-premise. Desain antarmuka dan mapping dibuat di <b>Enterprise Services Repository</b>; konfigurasi pengirim, penerima, dan routing di <b>Integration Directory</b>.','<b>Adapter</b> menghubungkan berbagai protokol: IDoc, RFC, SOAP, REST, file/SFTP, JDBC, AS2. Monitoring pesan di Message Monitor (PIMON) atau SXMB_MONI.'],
+tc:[['SXMB_MONI','Monitor pesan (ABAP stack)'],['PIMON','Monitoring PI/PO (Java)'],['ESR / ID','Repository dan directory']],
+keys:['ESR = desain, ID = konfigurasi','Adapter untuk banyak protokol','Pantau pesan gagal setiap hari'],
+cp:['Pesan PO ke vendor gagal karena server SFTP vendor mati. Setelah server hidup, tindakan yang tepat?',['Resend pesan dari monitor','Buat PO baru','Hapus vendor','Ubah mapping'],0,'Pesan gagal karena koneksi bisa dikirim ulang.']}),
+L('Cloud Integration (Integration Suite)',{p:['<b>SAP Integration Suite</b> di BTP berisi <b>Cloud Integration</b> (dulu CPI), API Management, Event Mesh, dan Integration Advisor. Alur integrasi dibuat sebagai <b>iFlow</b> berbasis web.','SAP menyediakan <b>prepackaged integration content</b>, misalnya SuccessFactors Employee Central ↔ S/4HANA, Ariba ↔ S/4HANA, sehingga proyek tidak mulai dari nol. Monitoring ada di Monitor Message Processing.'],
+tc:[['Integration Suite','Desain iFlow di BTP'],['Monitor Message Processing','Status pesan CPI'],['API Management','Publikasi dan keamanan API'],['Event Mesh','Integrasi berbasis event']],
+keys:['iFlow = alur integrasi di cloud','Gunakan konten standar SAP bila ada','Event Mesh untuk integrasi berbasis event'],
+cp:['Perusahaan memakai SuccessFactors dan S/4HANA dan ingin data karyawan tersinkron. Langkah awal yang efisien?',['Pakai prepackaged integration content di Integration Suite','Tulis program file manual','Input ulang data','Gunakan email'],0,'Konten standar mempercepat integrasi.']})
+],
+quiz:QZ([
+['Memproses ulang IDoc error?',['BD87','WE20','SM59','SE11'],0,'BD87.'],
+['Definisi koneksi RFC?',['SM59','WE02','SXMB_MONI','PFCG'],0,'SM59.'],
+['Status IDoc inbound yang berhasil diposting?',['53','51','64','02'],0,'53.'],
+['Alur integrasi di Cloud Integration disebut…',['iFlow','Variant','Infotype','Wave'],0,'iFlow.'],
+['Di PI/PO, mapping dan desain interface dibuat di…',['Enterprise Services Repository','Integration Directory','SU01','SE16N'],0,'ESR.']
+])}
+];
+
+/* ===================== SOLUSI PENDUKUNG ===================== */
+const MODS_CLOUD=[
+{id:'sf',code:'SF',cat:'cloud',title:'SAP SuccessFactors',dur:'30 mnt',
+sum:'Cloud HR: Employee Central, recruiting, onboarding, performance, learning, dan administrasi.',tcs:['Employee Central','Admin Center'],
+objs:['Mengenal modul SuccessFactors','Mengikuti proses talent dari recruiting sampai performance','Memahami administrasi dan integrasi'],
+note:'Tulis proses HR yang masih manual di perusahaanmu dan modul SF yang bisa membantu.',
+lessons:[
+L('Modul SuccessFactors',{p:['SuccessFactors adalah suite HR berbasis cloud. Intinya <b>Employee Central</b> (data karyawan, organisasi, posisi). Modul talent: Recruiting, Onboarding, Performance & Goals, Compensation, Succession & Development, dan Learning. Penggajian bisa memakai Employee Central Payroll.','Banyak perusahaan memakai model hybrid: data inti di SF, sedangkan payroll dan biaya tetap di S/4HANA, dengan integrasi otomatis.'],
+tc:[['Employee Central','Data inti karyawan'],['Recruiting / Onboarding','Rekrutmen sampai hari pertama'],['Performance & Goals','Target dan penilaian'],['Learning','Pelatihan dan sertifikasi']],
+keys:['Employee Central = inti','Modul talent terhubung satu sama lain','Model hybrid dengan S/4HANA umum dipakai'],
+cp:['Data struktur organisasi dan posisi karyawan di SuccessFactors disimpan di modul…',['Employee Central','Learning','Recruiting','Ariba'],0,'Employee Central.']}),
+L('Proses talent',{p:['Recruiting: <b>job requisition</b> disetujui → lowongan dipublikasi → kandidat melamar → interview → <b>offer</b>. Kandidat yang diterima masuk ke Onboarding untuk dokumen dan persiapan hari pertama, lalu menjadi karyawan di Employee Central.','Performance: target (goals) ditetapkan di awal tahun, <b>performance form</b> berjalan dalam route map (self-assessment, penilaian atasan, kalibrasi), lalu hasilnya dipakai untuk kompensasi dan succession.'],
+flow:[['Job requisition','approval'],['Kandidat','apply & interview'],['Offer','diterima'],['Onboarding','dokumen'],['Employee Central','karyawan aktif'],['Goals & performance','tahunan']],
+tc:[['Job Requisition','Permintaan rekrutmen'],['Performance Form','Formulir penilaian'],['Calibration','Penyelarasan nilai']],
+keys:['Requisition → kandidat → offer → onboarding','Goals dan performance form per siklus','Hasil penilaian dipakai kompensasi'],
+cp:['Kandidat sudah menandatangani offer. Modul berikutnya yang menangani dokumen dan persiapan hari pertama?',['Onboarding','Compensation','Learning','Employee Central Payroll'],0,'Onboarding.']}),
+L('Administrasi dan integrasi',{p:['Pengaturan dilakukan di <b>Admin Center</b>: Manage Permission Roles (role-based permissions/RBP), Manage Data, Import Employee Data, business rules, dan konfigurasi workflow.','Integrasi ke S/4HANA (misalnya replikasi karyawan dan cost center) memakai Integration Suite dengan konten standar. Perubahan konfigurasi diuji dulu di instance test lalu dipindah dengan Instance Sync.'],
+tc:[['Admin Center','Pusat administrasi'],['Manage Permission Roles','Role-based permissions'],['Import Employee Data','Upload data massal'],['Instance Sync','Memindahkan konfigurasi antar instance']],
+keys:['Admin Center = pusat konfigurasi','RBP mengatur siapa melihat apa','Integrasi lewat Integration Suite'],
+cp:['Manajer bisa melihat data gaji karyawan di divisi lain. Area yang perlu diperbaiki?',['Role-based permissions (target population)','Learning catalog','Job requisition','Goal plan'],0,'RBP mengatur populasi data yang boleh dilihat.']})
+],
+quiz:QZ([
+['Inti data karyawan di SF?',['Employee Central','Recruiting','Concur','Ariba'],0,'EC.'],
+['Hak akses di SF diatur dengan…',['Role-based permissions','PFCG','SU01','GRC firefighter'],0,'RBP.'],
+['Modul untuk pelatihan dan sertifikasi?',['Learning','Compensation','Onboarding','Succession'],0,'Learning.'],
+['Konfigurasi dipindah dari instance test ke produksi dengan…',['Instance Sync','STMS','SE09','BD87'],0,'Instance Sync.'],
+['Urutan recruiting yang benar?',['Requisition → kandidat → offer → onboarding','Offer → requisition → onboarding','Onboarding → offer','Kandidat → payroll → offer'],0,'Alur rekrutmen.']
+])},
+
+{id:'ariba',code:'ARIBA',cat:'cloud',title:'SAP Ariba',dur:'30 mnt',
+sum:'Ariba Network, sourcing, kontrak, guided buying, dan kolaborasi PO-invoice dengan supplier.',tcs:['Ariba Network','Sourcing','Guided Buying'],
+objs:['Mengenal solusi Ariba dan Ariba Network','Menjalankan source to contract','Memahami kolaborasi PO, ship notice, dan invoice dengan supplier'],
+note:'Tulis kategori belanja di perusahaanmu yang cocok untuk sourcing event kompetitif.',
+lessons:[
+L('Solusi Ariba',{p:['Ariba adalah suite procurement berbasis cloud. Komponennya: <b>Ariba Network</b> (jaringan supplier), <b>Sourcing</b> (RFI/RFP/RFQ dan auction), <b>Contracts</b>, <b>Buying & Invoicing</b> serta <b>Guided Buying</b> (belanja karyawan), dan <b>Supplier Lifecycle & Performance</b> (registrasi dan kualifikasi supplier).','Ariba sering dipasang berdampingan dengan S/4HANA: S/4 tetap untuk PO, GR, dan akuntansi, sedangkan Ariba untuk sourcing, kolaborasi, dan supplier.'],
+tc:[['Ariba Network','Kolaborasi dokumen dengan supplier'],['Sourcing','Event RFQ dan auction'],['Contracts','Workspace kontrak'],['Guided Buying','Belanja karyawan sesuai kebijakan']],
+keys:['Network, Sourcing, Contracts, Buying, SLP','Berdampingan dengan S/4HANA','Fokus kolaborasi dan kepatuhan belanja'],
+cp:['Perusahaan ingin supplier mendaftar sendiri, melengkapi dokumen legal, dan dikualifikasi sebelum boleh ikut tender. Solusi Ariba yang tepat?',['Supplier Lifecycle & Performance','Guided Buying','Ariba Network invoice','Contracts'],0,'SLP menangani registrasi dan kualifikasi supplier.']}),
+L('Source to contract',{p:['Buyer membuat <b>sourcing event</b> (misalnya RFQ) dengan item, kriteria, dan jadwal. Supplier mengajukan penawaran lewat Ariba. Buyer membandingkan, bisa menjalankan beberapa ronde atau auction, lalu <b>award</b>.','Hasil award dituangkan dalam <b>contract workspace</b> (dokumen, approval, tanda tangan) dan bisa menjadi kontrak/katalog yang dipakai saat belanja berikutnya.'],
+flow:[['Kebutuhan','spesifikasi'],['Sourcing event','RFQ / auction'],['Penawaran','supplier'],['Award','evaluasi'],['Contract','workspace'],['Katalog','dipakai belanja']],
+tc:[['Sourcing Event','RFQ/RFP/auction'],['Contract Workspace','Kontrak dan approval'],['Catalog','Harga dan item hasil kontrak']],
+keys:['Event → penawaran → award → kontrak','Auction untuk persaingan harga','Kontrak menjadi katalog'],
+cp:['Setelah award tender kemasan, langkah agar harga baru otomatis dipakai saat user belanja?',['Buat kontrak dan publikasikan sebagai katalog','Kirim email ke semua user','Ubah harga di MIRO','Buat sales order'],0,'Kontrak/katalog menjaga harga terpakai.']}),
+L('Kolaborasi PO sampai invoice',{p:['PO dari S/4HANA dikirim ke supplier lewat <b>Ariba Network</b>. Supplier mengirim <b>order confirmation</b>, lalu <b>ship notice (ASN)</b> saat barang dikirim, dan terakhir <b>invoice elektronik</b> yang divalidasi terhadap PO.','Dokumen dari supplier masuk otomatis ke S/4 (misalnya ASN menjadi inbound delivery, invoice menjadi dokumen MIRO). Koneksi standar memakai <b>Cloud Integration Gateway</b> / Integration Suite.'],
+flow:[['PO S/4','dikirim'],['Order confirmation','supplier'],['Ship notice','inbound delivery'],['GR','MIGO'],['e-Invoice','MIRO otomatis'],['Status bayar','terlihat supplier']],
+tc:[['Ariba Network','Inbox dokumen supplier'],['Cloud Integration Gateway','Koneksi S/4 ↔ Ariba']],
+integ:'Kolaborasi ini mengurangi entri manual di MM dan AP: invoice supplier yang sudah divalidasi di network lebih jarang blocked.',
+keys:['PO → confirmation → ASN → invoice','Dokumen supplier masuk otomatis ke S/4','Supplier bisa melihat status pembayaran'],
+cp:['Ship notice supplier di Ariba Network biasanya menjadi dokumen apa di S/4HANA?',['Inbound delivery','Sales order','Asset','Cost center'],0,'ASN → inbound delivery.']})
+],
+quiz:QZ([
+['Jaringan kolaborasi dengan supplier?',['Ariba Network','Employee Central','IBP','Fiori launchpad'],0,'Ariba Network.'],
+['Event tender harga dibuat di…',['Ariba Sourcing','Concur','C4C','Basis'],0,'Sourcing.'],
+['Belanja karyawan sesuai kebijakan memakai…',['Guided Buying','Auction','Dispute','Shipment'],0,'Guided Buying.'],
+['Ship notice dari supplier disebut juga…',['ASN','PIR','TO','IDoc 51'],0,'Advance ship notice.'],
+['Koneksi standar S/4HANA ke Ariba?',['Cloud Integration Gateway / Integration Suite','SM37','SE38','FF_5'],0,'CIG.']
+])},
+
+{id:'concur',code:'CONCUR',cat:'cloud',title:'SAP Concur',dur:'25 mnt',
+sum:'Expense report, travel request dan booking, invoice non-PO, audit, serta posting ke ERP.',tcs:['Expense','Travel','Invoice'],
+objs:['Membuat expense report sesuai kebijakan','Memahami travel request dan booking','Memahami Concur Invoice dan integrasi ke FI'],
+note:'Tulis tiga aturan kebijakan perjalanan dinas di perusahaanmu yang sering dilanggar.',
+lessons:[
+L('Expense',{p:['Karyawan membuat <b>expense report</b> untuk biaya dinas: tiket, hotel, makan, transport. Struk difoto (ExpenseIt membaca otomatis), transaksi kartu kredit korporat masuk sendiri, dan setiap baris diberi expense type serta objek biaya (cost center/WBS).','Report melewati <b>workflow approval</b> (atasan, lalu audit/finance). Kebijakan dicek otomatis: misalnya batas makan per hari atau kewajiban struk di atas nominal tertentu.'],
+flow:[['Foto struk','ExpenseIt'],['Expense report','expense type + cost object'],['Submit','cek kebijakan'],['Approval','atasan'],['Audit','finance'],['Posting & reimburse','ERP']],
+tc:[['Expense','Expense report'],['ExpenseIt','Baca struk otomatis'],['Corporate card feed','Transaksi kartu korporat']],
+keys:['Struk + expense type + cost object','Kebijakan dicek otomatis','Approval berjenjang sebelum dibayar'],
+cp:['Biaya dinas untuk proyek P-26-014 sebaiknya dibebankan ke…',['WBS proyek tersebut sebagai cost object','Cost center pribadi','Vendor','Tidak perlu diisi'],0,'Biaya proyek harus ke WBS.']}),
+L('Travel request dan booking',{p:['Perusahaan yang mewajibkan persetujuan awal memakai <b>travel request</b>: tujuan, tanggal, estimasi biaya, dan alasan. Setelah disetujui, karyawan memesan tiket dan hotel di <b>Concur Travel</b> sesuai kebijakan (kelas penerbangan, batas tarif hotel).','Data booking otomatis menjadi bagian expense report, sehingga pelaporan biaya dan perbandingan dengan estimasi lebih mudah.'],
+tc:[['Request','Persetujuan awal perjalanan'],['Travel','Pemesanan tiket dan hotel'],['TripIt','Itinerary perjalanan']],
+keys:['Request → approval → booking','Kebijakan travel diterapkan saat booking','Booking mengalir ke expense'],
+cp:['Hotel yang dipilih melebihi batas tarif kebijakan. Apa yang biasanya terjadi di Concur Travel?',['Muncul peringatan kebijakan dan perlu alasan/approval tambahan','Booking otomatis dibatalkan tanpa info','Tidak ada pengaruh','Gaji dipotong otomatis'],0,'Pelanggaran kebijakan ditandai dan butuh justifikasi.']}),
+L('Invoice, audit, dan integrasi',{p:['<b>Concur Invoice</b> dipakai untuk tagihan non-PO (misalnya langganan, utilitas): invoice dipindai, divalidasi, disetujui, lalu dikirim ke ERP untuk dibayar.','Data yang sudah disetujui diekspor ke S/4HANA/ECC sebagai jurnal (beban, hutang karyawan atau vendor), lengkap dengan cost center/WBS. Laporan analitik membantu melihat pola biaya dan pelanggaran kebijakan.'],
+tc:[['Invoice','Invoice non-PO'],['Audit rules','Aturan audit otomatis'],['Intelligence / Analytics','Laporan biaya']],
+integ:'Concur memakai master cost center, WBS, dan karyawan dari SAP, lalu mengirim jurnal kembali ke FI. Cost object yang tidak aktif di SAP akan membuat posting gagal.',
+keys:['Invoice non-PO dengan approval','Posting ke FI dengan cost object','Analitik untuk kepatuhan kebijakan'],
+cp:['Expense report sudah disetujui tetapi gagal diposting ke SAP karena WBS sudah ditutup. Penyebabnya ada di…',['Status cost object di SAP (WBS closed)','Foto struk','Kartu kredit','Kebijakan hotel'],0,'Cost object harus aktif di ERP.']})
+],
+quiz:QZ([
+['Membaca struk otomatis di Concur?',['ExpenseIt','Guided Buying','RSPC','QA32'],0,'ExpenseIt.'],
+['Persetujuan awal perjalanan dinas?',['Travel request','Expense type','Dunning','Shipment'],0,'Request.'],
+['Invoice non-PO di Concur?',['Concur Invoice','MIRO','VF01','KO88'],0,'Concur Invoice.'],
+['Expense report dikirim ke SAP sebagai…',['Jurnal FI dengan cost object','Sales order','Material master','IDoc ORDERS'],0,'Posting FI.'],
+['Kenapa setiap baris expense butuh cost object?',['Agar biaya masuk ke cost center/WBS yang benar','Agar struk lebih jelas','Untuk tiket pesawat','Tidak penting'],0,'Pembebanan biaya.']
+])},
+
+{id:'crm',code:'CRM/C4C',cat:'cloud',title:'SAP CRM / Sales & Service Cloud (C4C)',dur:'25 mnt',
+sum:'Account, lead, opportunity, quote, pipeline, ticket service, dan integrasi ke S/4HANA.',tcs:['Account','Lead','Opportunity','Ticket'],
+objs:['Mengenal objek CRM: account, contact, lead, opportunity','Mengelola pipeline penjualan','Mengelola ticket layanan dan SLA'],
+note:'Tulis tahapan penjualan (sales stage) yang dipakai timmu.',
+lessons:[
+L('Objek CRM',{p:['SAP CRM (on-premise) dan <b>SAP Sales Cloud / Service Cloud</b> (C4C, bagian dari SAP Customer Experience) mengelola hubungan dengan customer sebelum dan sesudah transaksi. Objek inti: <b>account</b> (perusahaan), <b>contact</b> (orang), <b>activity</b> (kunjungan, telepon, email).','Account di CRM biasanya tersinkron dengan business partner customer di S/4HANA agar data penjualan dan piutang konsisten.'],
+tc:[['Account / Contact','Data customer dan orang'],['Activity','Kunjungan, telepon, tugas'],['Visit planning','Rencana kunjungan sales lapangan']],
+keys:['Account = perusahaan, contact = orang','Activity mencatat interaksi','Sinkron dengan BP di S/4HANA'],
+cp:['Sales mengunjungi pembeli di toko ritel. Interaksi ini dicatat sebagai…',['Activity (visit) pada account','Billing','Inspection lot','Asset'],0,'Activity.']}),
+L('Lead to quote',{p:['<b>Lead</b> adalah minat awal yang belum terkualifikasi. Setelah dikualifikasi menjadi <b>opportunity</b> dengan nilai, probabilitas, sales stage, dan tanggal perkiraan closing. Kumpulan opportunity membentuk <b>pipeline</b> dan forecast.','Opportunity yang matang menghasilkan <b>quote</b>; harga bisa diambil dari S/4HANA. Quote yang disetujui customer diteruskan menjadi sales order di S/4.'],
+flow:[['Lead','minat'],['Kualifikasi',''],['Opportunity','nilai & stage'],['Quote','harga S/4'],['Sales order','S/4HANA']],
+tc:[['Lead','Minat awal'],['Opportunity','Peluang terkualifikasi'],['Pipeline / Forecast','Analisis penjualan'],['Sales Quote','Penawaran harga']],
+keys:['Lead → opportunity → quote → order','Pipeline untuk forecast','Order eksekusi di S/4HANA'],
+cp:['Manajer sales ingin memperkirakan pendapatan kuartal depan. Data CRM yang paling relevan?',['Pipeline opportunity dengan nilai, stage, dan probabilitas','Daftar contact','Ticket service','Material master'],0,'Pipeline = dasar forecast.']}),
+L('Service dan integrasi',{p:['Di Service Cloud, keluhan masuk sebagai <b>ticket</b> dari email, portal, telepon, atau chat. Ticket punya prioritas, <b>SLA</b> (batas waktu respons/penyelesaian), dan bisa memakai knowledge base.','Integrasi dengan S/4HANA (lewat Integration Suite) membawa account, material, harga, status order, dan invoice, sehingga agen bisa menjawab pertanyaan customer tanpa membuka banyak sistem.'],
+tc:[['Ticket','Kasus layanan'],['SLA','Target waktu respons'],['Knowledge Base','Artikel solusi']],
+keys:['Ticket dengan prioritas dan SLA','Knowledge base mempercepat solusi','Integrasi memberi gambaran 360° customer'],
+cp:['Agen layanan perlu melihat status pengiriman order customer saat menangani ticket. Hal yang memungkinkan?',['Integrasi C4C dengan S/4HANA (status order/delivery)','Membuka SM37','Membuat PO','Menjalankan F110'],0,'Integrasi data order.']})
+],
+quiz:QZ([
+['Minat awal yang belum terkualifikasi?',['Lead','Opportunity','Quote','Ticket'],0,'Lead.'],
+['Dasar forecast penjualan di CRM?',['Pipeline opportunity','Ticket','Activity','Contact'],0,'Pipeline.'],
+['Batas waktu respons ticket?',['SLA','MRP','ATP','FSV'],0,'SLA.'],
+['Quote yang disetujui diteruskan menjadi…',['Sales order di S/4HANA','Purchase order','Production order','Asset'],0,'Sales order.'],
+['Objek untuk perusahaan customer?',['Account','Contact','Lead','Activity'],0,'Account.']
+])},
+
+{id:'ibp',code:'SCM/IBP',cat:'cloud',title:'SAP SCM / Integrated Business Planning',dur:'30 mnt',
+sum:'S&OP, demand planning, supply planning, inventory optimization, dan integrasi dengan S/4HANA.',tcs:['IBP Excel add-in','Demand','Supply','S&OP'],
+objs:['Mengenal cakupan perencanaan supply chain dan IBP','Membuat dan mengevaluasi forecast','Memahami supply planning dan siklus S&OP'],
+note:'Tulis siklus S&OP bulanan di perusahaanmu: siapa hadir dan keputusan apa yang diambil.',
+lessons:[
+L('Cakupan SCM dan IBP',{p:['Perencanaan supply chain dulu memakai SAP APO (on-premise). Penggantinya adalah <b>SAP IBP</b> (cloud) dengan modul S&OP, Demand, Supply (Response & Supply), Inventory, dan Supply Chain Control Tower.','Planner bekerja terutama di <b>Excel add-in IBP</b> (planning view) dan app web untuk alert, analitik, dan proses.'],
+tc:[['IBP Excel add-in','Planning view'],['Planner Workspaces','Ruang kerja planner'],['Control Tower','Visibilitas dan alert supply chain']],
+keys:['APO (lama) → IBP (cloud)','Modul: S&OP, Demand, Supply, Inventory','Excel add-in sebagai alat utama planner'],
+cp:['Alat utama planner IBP untuk melihat dan mengubah angka rencana adalah…',['Excel add-in (planning view)','SE38','MIGO','FB50'],0,'Planning view di Excel.']}),
+L('Demand planning',{p:['Forecast statistik dihitung dari histori penjualan dengan model seperti moving average, exponential smoothing, atau metode lain. Planner lalu menambah masukan pasar (promosi, produk baru) menjadi <b>consensus demand</b>.','Kualitas forecast diukur dengan error, misalnya <b>MAPE</b> dan bias. Demand sensing memakai sinyal jangka pendek (order terbaru) untuk koreksi minggu-minggu terdekat.'],
+tc:[['Statistical forecasting','Model forecast'],['Consensus demand','Angka sepakat sales-marketing-ops'],['Forecast error (MAPE, bias)','Ukuran akurasi']],
+keys:['Forecast statistik + input pasar = consensus','Ukur akurasi dengan MAPE dan bias','Demand sensing untuk jangka pendek'],
+cp:['Forecast produk A selalu lebih tinggi dari realisasi 3 bulan berturut-turut. Indikator yang menunjukkan ini?',['Bias positif','MAPE nol','Safety stock','Lead time'],0,'Bias menunjukkan kecenderungan over/under forecast.']}),
+L('Supply planning dan S&OP',{p:['Supply planning menyeimbangkan permintaan dengan kapasitas, stok, dan pasokan, memakai heuristic atau optimizer. Hasilnya rencana produksi dan distribusi yang realistis.','<b>S&OP</b> adalah siklus bulanan: product review → demand review → supply review → pre-S&OP → executive S&OP. Rencana yang disepakati dikirim ke S/4HANA (misalnya sebagai PIR) dan menjadi masukan MRP.'],
+flow:[['Product review',''],['Demand review','consensus'],['Supply review','kapasitas'],['Pre-S&OP','skenario'],['Executive S&OP','keputusan'],['Ke S/4','PIR → MRP']],
+tc:[['Supply heuristic / optimizer','Rencana pasokan'],['Scenario planning','Simulasi what-if'],['Integrasi S/4','Data master & PIR']],
+integ:'IBP menerima master data, stok, dan order dari S/4HANA, lalu mengirim rencana kembali. MRP di S/4 (PP) mengeksekusi rencana menjadi planned order dan PR.',
+keys:['Supply plan menyeimbangkan demand dan kapasitas','S&OP bulanan berakhir di keputusan eksekutif','Hasil IBP menjadi input MRP di S/4'],
+cp:['Rencana S&OP sudah disetujui. Bagaimana rencana itu dieksekusi di S/4HANA?',['Dikirim sebagai PIR lalu MRP membuat planned order/PR','Ditulis manual di email','Diposting sebagai jurnal FI','Tidak dieksekusi'],0,'IBP → PIR → MRP.']})
+],
+quiz:QZ([
+['Pengganti cloud untuk SAP APO?',['SAP IBP','SAP Concur','SAP Ariba','SAP BW'],0,'IBP.'],
+['Angka forecast yang disepakati lintas fungsi?',['Consensus demand','Safety stock','Bias','PIR negatif'],0,'Consensus demand.'],
+['Ukuran akurasi forecast?',['MAPE','ATP','SLA','APC'],0,'MAPE.'],
+['Tahap terakhir siklus S&OP?',['Executive S&OP','Product review','Demand review','Supply review'],0,'Executive.'],
+['Rencana IBP masuk ke MRP S/4 sebagai…',['PIR (planned independent requirements)','Billing','Invoice','Dispute'],0,'PIR.']
+])}
+];
+
+/* ===================== KATALOG LENGKAP, ROLE & MIGRASI ===================== */
+const CATS=[
+ {id:'dasar',t:'Dasar SAP',d:'Fondasi untuk semua role: navigasi, data induk, struktur organisasi.'},
+ {id:'fin',t:'Finance',d:'Akuntansi keuangan, controlling, treasury, dan manajemen piutang.'},
+ {id:'log',t:'Logistik',d:'Pembelian, persediaan, penjualan, produksi, mutu, perawatan, gudang, proyek.'},
+ {id:'hr',t:'Human Resources',d:'Organisasi, data karyawan, waktu kerja, dan payroll.'},
+ {id:'tech',t:'Teknis',d:'Administrasi sistem, pemrograman, UI, keamanan, analitik, integrasi.'},
+ {id:'cloud',t:'Solusi pendukung',d:'Aplikasi cloud SAP yang melengkapi S/4HANA.'}];
+const LEG_MAP={1:['nav','NAV','dasar','Navigasi SAP GUI'],2:['org','ORG','dasar','Data Induk & Struktur Organisasi'],3:['mm-pur','MM-PUR','log','MM – Pembelian: Procure to Pay'],4:['mm-im','MM-IM','log','MM – Inventory: MIGO & Movement Type'],5:['mm-pi','MM-PI','log','MM – Stok & Stock Opname'],6:['fi-aa','FI-AA','fin','FI-AA – Asset Accounting'],7:['ps','PS','log','PS – Project System: WBS, Biaya & Kurva S'],8:['ps-ops','PS-OPS','log','Rutinitas Admin Proyek, PWO & K3']};
+LEGACY_MODS.forEach(m=>{const x=LEG_MAP[m.id];m.legacy=m.id;Object.assign(m,{id:x[0],code:x[1],cat:x[2],title:x[3]});});
+(()=>{const aa=LEGACY_MODS.find(m=>m.id==='fi-aa');
+ aa.sum='Master aset, AuC, kapitalisasi, penyusutan, transfer, dan retirement aset tetap.';
+ aa.lessons.push(L('Siklus aset dari sisi Finance',{p:['Tim aset di Finance mengelola seluruh umur aset: <b>akuisisi</b> (aset dibuat di AS01 dan nilai masuk lewat MIRO, F-90, atau settlement AuC), <b>penyusutan</b> bulanan dengan <b>AFAB</b> berdasarkan depreciation key dan umur manfaat, <b>transfer</b> antar cost center atau company code (ABUMN), dan <b>retirement</b> saat aset dijual atau dibuang (ABAON dengan pendapatan, ABAVN tanpa pendapatan).','Satu aset bisa punya beberapa <b>depreciation area</b>, misalnya buku komersial dan pajak, dengan umur dan metode berbeda. Asset Explorer (AW01N) menampilkan nilai per area dan per tahun.'],
+ flow:[['AS01','master aset'],['Akuisisi','MIRO / F-90 / AIBU'],['AFAB','penyusutan bulanan'],['ABUMN','transfer'],['ABAON / ABAVN','retirement'],['AJAB','tutup tahun aset']],
+ tc:[['AS01 / AS02 / AS03','Membuat / mengubah / menampilkan aset'],['AFAB','Depreciation run'],['ABUMN','Transfer aset dalam company code'],['ABAON / ABAVN','Retirement dengan / tanpa pendapatan'],['AR01','Asset balances (daftar aset)']],
+ integ:'Penyusutan AFAB memposting beban ke cost center di master aset. Jika aset dipindah fisik tanpa ABUMN/perubahan cost center, beban penyusutan jatuh ke departemen yang salah.',
+ keys:['Akuisisi → penyusutan → transfer → retirement','AFAB dijalankan tiap bulan saat tutup buku','Depreciation area: komersial vs pajak'],
+ cp:['Mesin lama dijual ke pihak lain seharga Rp 20 jt. Transaksi aset yang tepat?',['Retirement dengan pendapatan (ABAON / atau via FI customer)','ABAVN scrapping','AFAB','AS02 ubah deskripsi'],0,'Penjualan aset = retirement dengan revenue.']}));
+ aa.quiz.push(cp('Depreciation run bulanan dijalankan dengan…',['AFAB','AIBU','AS03','F110'],0,'AFAB.'));})();
+const ALLMODS=[...LEGACY_MODS,...MODS_FIN,...MODS_LOG,...MODS_TECH,...MODS_CLOUD];
+const ORDER=['nav','org','fi-gl','fi-ap','fi-ar','fi-aa','co','tr','fscm','mm-pur','mm-im','mm-pi','sd','pp','qm','pm','wm','le','ps','ps-ops','cs','lo','hcm','basis','abap','fiori','grc','bw','pi','sf','ariba','concur','crm','ibp'];
+const MODULES=ORDER.map(id=>ALLMODS.find(m=>m.id===id));
+const MOD=Object.fromEntries(MODULES.map(m=>[m.id,m]));
+MODULES.forEach((m,i)=>{m.no=i+1;});
+
+/* ---------- ROLE / ARAH KARIR ---------- */
+const RGRP=[['ops','Logistik & operasional'],['fin','Finance'],['hr','HR'],['tech','Teknis & data']];
+const ROLES=[
+{id:'wh',grp:'ops',t:'Warehouse Analyst',d:'Mengelola penerimaan, penyimpanan, picking, dan akurasi stok gudang.',tasks:['Memantau putaway dan picking','Menjaga akurasi stok per bin','Menangani selisih dan opname'],w:['wm','mm-im','mm-pi'],g:['nav','org','le'],p:['mm-pur','qm','sd','lo']},
+{id:'inv',grp:'ops',t:'Inventory Analyst',d:'Menganalisis level stok, perputaran, selisih, dan nilai persediaan.',tasks:['Analisis stok lambat & kedaluwarsa','Rekonsiliasi nilai persediaan','Koordinasi opname'],w:['mm-im','mm-pi','lo'],g:['nav','org','mm-pur'],p:['wm','pp','fi-gl','bw']},
+{id:'proc',grp:'ops',t:'Procurement Analyst',d:'Mengelola PR sampai PO, vendor, harga, dan kinerja pemasok.',tasks:['Memproses PR menjadi PO','Sourcing & negosiasi harga','Follow up pengiriman vendor'],w:['mm-pur','ariba'],g:['nav','org','mm-im'],p:['fi-ap','qm','co','lo']},
+{id:'log',grp:'ops',t:'Logistics Analyst',d:'Merencanakan dan memantau pengiriman, transportasi, dan distribusi.',tasks:['Delivery & shipment','Biaya angkut','Kinerja on-time delivery'],w:['le','sd','wm'],g:['nav','org','mm-im','lo'],p:['mm-pur','pp','ibp']},
+{id:'sales',grp:'ops',t:'Sales Admin',d:'Memproses order penjualan sampai penagihan dan melayani pertanyaan customer.',tasks:['Membuat sales order','Memantau delivery & billing','Menangani retur'],w:['sd','crm'],g:['nav','org','le','fscm'],p:['fi-ar','mm-im','cs','lo']},
+{id:'ppc',grp:'ops',t:'Production Planner (PPIC)',d:'Merencanakan produksi dan kebutuhan material dengan MRP.',tasks:['Membaca MD04 & exception','Membuat & merilis production order','Menyeimbangkan kapasitas'],w:['pp','mm-im'],g:['nav','org','qm','ibp'],p:['mm-pur','pm','co','lo']},
+{id:'qc',grp:'ops',t:'Quality Control / QA',d:'Memeriksa mutu bahan dan produk, mengambil keputusan rilis, dan menangani keluhan.',tasks:['Inspection lot & hasil uji','Usage decision','Quality notification'],w:['qm'],g:['nav','org','mm-im','lo'],p:['pp','mm-pur','pm','sd']},
+{id:'mp',grp:'ops',t:'Maintenance Planner',d:'Merencanakan perawatan korektif dan preventif mesin.',tasks:['Notification & work order','Preventive plan','Sparepart & biaya order'],w:['pm','mm-im'],g:['nav','org','mm-pur'],p:['co','fi-aa','qm','cs']},
+{id:'proj',grp:'ops',t:'Project Admin',d:'Administrasi proyek: PR/PO, penerimaan, biaya WBS, aset, dan laporan progres.',tasks:['PR, PO, GR untuk proyek','Monitoring biaya & Kurva S','Dokumen kapitalisasi aset'],w:['ps','ps-ops','mm-pur','mm-im'],g:['nav','org','mm-pi'],p:['fi-aa','co','pm','fiori']},
+{id:'scp',grp:'ops',t:'Supply Chain Planner',d:'Menyusun forecast, rencana pasokan, dan memimpin siklus S&OP.',tasks:['Demand planning','Supply planning','Persiapan rapat S&OP'],w:['ibp','pp'],g:['nav','org','sd','mm-im'],p:['le','mm-pur','bw']},
+{id:'svc',grp:'ops',t:'Customer Service Admin',d:'Menangani servis purna jual, kontrak servis, dan repair.',tasks:['Service notification & order','Kontrak & garansi','Penagihan servis'],w:['cs','sd'],g:['nav','org','crm'],p:['pm','fi-ar','le','mm-im']},
+{id:'fin',grp:'fin',t:'Finance / Accountant',d:'Mencatat transaksi, tutup buku, dan menyusun laporan keuangan.',tasks:['Jurnal & accrual','Tutup buku bulanan','Laporan keuangan'],w:['fi-gl','fi-ap','fi-ar','fi-aa'],g:['nav','org','co'],p:['tr','fscm','mm-pur','sd','bw']},
+{id:'apar',grp:'fin',t:'AP / AR Specialist',d:'Memproses invoice vendor, pembayaran, penagihan, dan penerimaan customer.',tasks:['MIRO / FB60','Payment run F110','Penerimaan & aging piutang'],w:['fi-ap','fi-ar'],g:['nav','org','fi-gl'],p:['mm-pur','sd','tr','fscm','concur']},
+{id:'ctrl',grp:'fin',t:'Controller / Cost Analyst',d:'Menganalisis biaya, anggaran, profitabilitas, dan variance produksi.',tasks:['Plan vs actual cost center','Internal order & budget','Standard cost & variance'],w:['co','fi-gl'],g:['nav','org','fi-aa','ps'],p:['pp','mm-im','sd','bw']},
+{id:'treas',grp:'fin',t:'Treasury & Credit Analyst',d:'Mengelola kas, bank, likuiditas, limit kredit, dan penagihan.',tasks:['Bank statement & rekonsiliasi','Cash position & forecast','Credit limit & collections'],w:['tr','fscm'],g:['nav','org','fi-ar','fi-gl'],p:['fi-ap','sd','bw']},
+{id:'hr',grp:'hr',t:'HR & Payroll Admin',d:'Mengelola data karyawan, absensi, dan penggajian.',tasks:['Personnel action & infotype','Absensi & cuti','Proses payroll bulanan'],w:['hcm','sf'],g:['nav','org'],p:['fi-gl','co','concur','fiori']},
+{id:'abap',grp:'tech',t:'ABAP / Fiori Developer',d:'Membangun laporan, form, enhancement, dan aplikasi Fiori.',tasks:['Laporan ALV & form','BAdI & BAPI','App Fiori/UI5'],w:['abap','fiori'],g:['nav','org','basis'],p:['pi','bw','grc','mm-pur','sd']},
+{id:'basis',grp:'tech',t:'Basis Administrator',d:'Menjaga sistem SAP tetap sehat, aman, dan up to date.',tasks:['Monitoring harian','User & job','Transport & upgrade'],w:['basis','grc'],g:['nav','org'],p:['abap','fiori','pi','bw']},
+{id:'sec',grp:'tech',t:'Security & GRC Analyst',d:'Mengelola role, akses, SoD, dan dukungan audit.',tasks:['Desain role PFCG','Analisis SoD','Access review & audit'],w:['grc','basis'],g:['nav','org'],p:['fi-gl','mm-pur','hcm','abap']},
+{id:'bi',grp:'tech',t:'BI / Data Analyst',d:'Menyediakan data, laporan, dan dashboard untuk keputusan bisnis.',tasks:['Query & dashboard','Monitoring load data','Rekonsiliasi KPI'],w:['bw'],g:['nav','org','fi-gl','co'],p:['sd','mm-im','abap','ibp']}
+];
+const REL={w:['Wajib','rel-w','Inti pekerjaan role ini. Kuasai lebih dulu.'],g:['General','rel-g','Dipakai umum sehari-hari, termasuk dasar SAP.'],p:['Pendukung','rel-p','Membantu memahami proses tetangga. Pelajari setelah wajib & general.']};
+function roleOf(){return ROLES.find(r=>r.id===S.role)||null;}
+function relOf(mid,r){r=r===undefined?roleOf():r;if(!r)return null;return r.w.includes(mid)?'w':r.g.includes(mid)?'g':r.p.includes(mid)?'p':null;}
+function rolePath(r){const f=r.g.filter(x=>x==='nav'||x==='org');return [...f,...r.w,...r.g.filter(x=>!f.includes(x)),...r.p];}
+function relPill(k){return k?`<span class="pill ${REL[k][1]}">${REL[k][0]}</span>`:'';}
+
+/* ---------- studi kasus keputusan → modul ---------- */
+const CASE_MOD={'Pembelian':'mm-pur','Jasa':'mm-pur','Movement type':'mm-im','Penerimaan':'mm-im','Opname':'mm-pi','Inventory':'mm-pi','Aset':'fi-aa','Biaya proyek':'ps','Laporan':'ps','K3 & keamanan pangan':'ps-ops','Document control':'ps-ops'};
+CASES.forEach(c=>{c.mod=CASE_MOD[c.tag]||'ps-ops';});
+
+/* ---------- migrasi progres versi lama (modul 1–8) ---------- */
+(()=>{if(S.v3)return;['les','mq','notes'].forEach(k=>{const o=S[k]||{};Object.keys(o).forEach(key=>{const x=LEG_MAP[key];if(x){o[x[0]]=o[key];delete o[key];}});S[k]=o;});
+ const had=Object.keys(S.les).length||Object.keys(S.sims||{}).length;if(!S.role&&had)S.role='proj';S.v3=true;save();})();
 /* ===================== SIMULATOR DATA ===================== */
 const TODAY='04.11.2026';
 const KNOWN={ME51N:'Create Purchase Requisition',ME52N:'Change Purchase Requisition',ME53N:'Display Purchase Requisition',ME5A:'List Display of Purchase Requisitions',ME21N:'Create Purchase Order',ME22N:'Change Purchase Order',ME23N:'Display Purchase Order',ME2N:'Purchasing Documents per Document Number',ME2L:'Purchasing Documents per Vendor',ME2M:'Purchasing Documents per Material',MIGO:'Goods Movement',ML81N:'Service Entry Sheet',MIRO:'Enter Incoming Invoice',MB52:'Display Warehouse Stocks of Material',MMBE:'Stock Overview',MB51:'Material Document List',MB03:'Display Material Document',MM03:'Display Material',MI01:'Create Physical Inventory Document',MI21:'Print Physical Inventory Document',MI04:'Enter Inventory Count',MI11:'Recount',MI20:'List of Inventory Differences',MI07:'Post Inventory Difference',AS03:'Display Asset',AW01N:'Asset Explorer',AR01:'Asset Balances',AIAB:'AuC Distribution Rule',AIBU:'AuC Settlement',CJ20N:'Project Builder',CJI3:'Display Project Actual Cost Line Items',CJI5:'Display Project Commitment Line Items',KSB1:'Display Actual Cost Line Items for Cost Centers',KOB1:'Display Actual Cost Line Items for Orders',IE03:'Display Equipment',IW33:'Display PM Order',IW38:'Change PM Orders: Selection',ME54N:'Release Purchase Requisition',XK03:'Display Vendor',KS03:'Display Cost Center',CJ13:'Display WBS Element',KO03:'Display Internal Order'};
@@ -1539,6 +2368,156 @@ KQ('Vendor tidak bisa mengirim declaration dalam 7 hari, padahal instalasi dijad
 KQ('Di mana COA dan nantinya declaration disimpan?',[['Folder proyek dengan penamaan standar + nomor material document 5000187375, dan ditautkan di database PWO',null],['Laptop pribadi','Tidak bisa diakses tim dan auditor.'],['Tidak perlu disimpan','Dokumen wajib untuk audit keamanan pangan.'],['Dikirim balik ke vendor','Perusahaan wajib menyimpan salinannya.']],'Document control yang rapi mempercepat audit.')
 ]}
 );
+
+/* ===================== SKENARIO MODUL INTI: SD, FI, PP, WM ===================== */
+SIMS.forEach(s=>{if(typeof s.mod==='number')s.mod=LEG_MAP[s.mod][0];});
+Object.assign(KNOWN,{VA01:'Create Sales Order',VA02:'Change Sales Order',VA03:'Display Sales Order',VA05:'List of Sales Orders',VL01N:'Create Outbound Delivery with Order Reference',VL02N:'Change Outbound Delivery',VL06O:'Outbound Delivery Monitor',VF01:'Create Billing Document',VF03:'Display Billing Document',
+ FB60:'Enter Incoming Invoices',FB50:'Enter G/L Account Document',FB03:'Display Document','F-53':'Post Outgoing Payments',FBL1N:'Vendor Line Item Display',FBL5N:'Customer Line Item Display',F110:'Automatic Payment Transactions',
+ MD04:'Display Stock/Requirements Situation',MD01N:'MRP Live',CO01:'Create Production Order',CO03:'Display Production Order',CO11N:'Enter Time Ticket for Production Order',
+ LT01:'Create Transfer Order',LT12:'Confirm Transfer Order',LX02:'Stock List'});
+FAVS.push('VA01','VL01N','VF01','FB60','F-53','FBL1N','MD04','CO01','LT01','LT12','LX02');
+TREE[0].c.push(
+ {l:'Sales and Distribution',c:[{l:'Sales',c:[{l:'Order',c:[['VA01','Create'],['VA03','Display']]}]},{l:'Shipping and Transportation',c:[{l:'Outbound Delivery',c:[['VL01N','Create - Single Document']]}]},{l:'Billing',c:[{l:'Billing Document',c:[['VF01','Create']]}]}]},
+ {l:'Production',c:[{l:'MRP',c:[{l:'Evaluations',c:[['MD04','Stock/Reqmts List']]}]},{l:'Shop Floor Control',c:[{l:'Order',c:[{l:'Create',c:[['CO01','With Material']]}]}]}]},
+ {l:'Logistics Execution',c:[{l:'Internal Whse Processes',c:[{l:'Stock Transfer',c:[{l:'Create Transfer Order',c:[['LT01','No Source Object']]}]},{l:'Confirm',c:[['LT12','Transfer Order – Single Document']]}]},{l:'Information System',c:[{l:'Warehouse',c:[['LX02','Stock per Bin']]}]}]});
+TREE[1].c[0].c.push({l:'Accounts Payable',c:[{l:'Document Entry',c:[['FB60','Invoice'],['F-53','Outgoing Payment – Post']]},{l:'Account',c:[['FBL1N','Display/Change Line Items']]}]});
+const FG={'500010':{d:'BISKUIT KELAPA 200G (KARTON)',u:'CAR',p:96000},'500011':{d:'BISKUIT COKLAT 200G (KARTON)',u:'CAR',p:99000},'500020':{d:'WAFER VANILA 150G (KARTON)',u:'CAR',p:84000}};
+Object.assign(F4,{auart:[['OR','Standard Order'],['RE','Returns'],['QT','Quotation']],vkorg:[['1000','Sales Org Indonesia']],vtweg:[['10','Modern trade'],['20','General trade']],spart:[['00','Cross-division']],
+ kunnr:[['200145','PT Sumber Retail – Kantor Pusat'],['200146','PT Sumber Retail – DC Cibitung'],['200210','CV Toko Makmur']],matfg:Object.entries(FG).map(([k,v])=>[k,v.d]),
+ vstel:[['1100','Shipping Point Cikarang']],vbeln:[['10000871','PT Sumber Retail · 120 CAR']],vbelnd:[['80001542','Delivery PT Sumber Retail · 120 CAR']],
+ lifnr:[['100230','PT Lift Prima'],['100118','PT Mitra Teknik Abadi'],['100125','CV Sinar Elektrik']],saknr:[['610300','Beban sewa peralatan'],['610100','Beban listrik'],['510200','Sparepart & consumable']],hkont:[['111210','Bank Mandiri – outgoing'],['111310','Bank BCA – outgoing']],
+ matpp:[['500010','BISKUIT KELAPA 200G (KARTON)'],['400020','GULA PASIR'],['400031','TEPUNG TERIGU']],auartpp:[['PP01','Standard production order']],
+ lgnum:[['110','Gudang FG Cikarang']],bwlvs:[['999','Manual stock transfer'],['101','GR for purchase order'],['601','GI for delivery']],lgtyp:[['001','High rack'],['002','Picking area'],['902','GR area']],tanum:[['4711','500010 · 40 CAR · 001 → 002']]});
+F4.kostl.push(['11WH100','Gudang FG']);F4.lgort.push(['1001','Gudang Barang Jadi']);
+const numv=s=>{const t=String(s??'').trim().replace(/\s/g,'');if(!t)return NaN;return +(t.includes(',')?t.replace(/\./g,'').replace(',','.'):t.replace(/\./g,''));};
+const AMT=(n,idn,sap)=>({eq:String(n),fn:x=>numv(x)===n?null:{sap:sap||(String(x??'').trim()?'Check entry in field Amount':'Fill in all required entry fields'),idn}});
+const ALV_FBL1N={cols:[{id:'doc',l:'DocumentNo'},{id:'ty',l:'Type'},{id:'ref',l:'Reference'},{id:'dd',l:'Net due dt',date:1},{id:'val',l:'Amount in LC',num:1},{id:'blk',l:'Pmnt block'},{id:'txt',l:'Text'}],
+ rows:[{doc:'1900004377',ty:'KR',ref:'INV-LP-0870',dd:'05.11.2026',val:12500000,blk:'R',txt:'Sewa forklift Okt – dispute jam operasi'},{doc:'1900004601',ty:'KR',ref:'INV-LP-0925',dd:'14.12.2026',val:7500000,blk:'',txt:'Servis forklift'}]};
+const ALV_LX02={cols:[{id:'typ',l:'Typ'},{id:'bin',l:'StorageBin'},{id:'mat',l:'Material'},{id:'txt',l:'Material Description'},{id:'qty',l:'Avail. stock',num:1},{id:'bun',l:'BUn'},{id:'gr',l:'GR Date',date:1}],
+ rows:[{typ:'001',bin:'001-02-03',mat:'500010',txt:'BISKUIT KELAPA 200G (KARTON)',qty:160,bun:'CAR',gr:'28.10.2026'},{typ:'001',bin:'001-05-01',mat:'500010',txt:'BISKUIT KELAPA 200G (KARTON)',qty:240,bun:'CAR',gr:'15.10.2026'},{typ:'001',bin:'001-07-02',mat:'500010',txt:'BISKUIT KELAPA 200G (KARTON)',qty:200,bun:'CAR',gr:'02.11.2026'},{typ:'002',bin:'P-01-04',mat:'500010',txt:'BISKUIT KELAPA 200G (KARTON)',qty:40,bun:'CAR',gr:'28.10.2026'}]};
+
+SIMS.push(
+{id:'d1',title:'Buat sales order standar (VA01)',mod:'sd',lvl:'Menengah',
+brief:{from:'Bu Sinta, Key Account Manager',msg:'PT Sumber Retail (sold-to 200145) pesan 120 karton Biskuit Kelapa 200g, nomor PO mereka PO-SR-7781. Kirim ke DC Cibitung mereka (ship-to 200146), diminta tiba 18.11.2026. Pakai order standar, sales org 1000, channel modern trade, division 00.'},
+steps:[
+{k:'tx',tc:'VA01',instr:'Buka VA01. Isi order type dan sales area, Enter. Di overview isi sold-to, ship-to, cust. reference, tanggal kirim, lalu baris item. Enter untuk memuat harga, lalu Save.',
+screens:[
+ {title:'Create Sales Documents',go:'enter',blocks:[{t:'group',title:'',fields:[{id:'auart',l:'Order Type',w:4,f4:'auart'}]},{t:'group',title:'Organizational Data',fields:[{id:'vkorg',l:'Sales Organization',w:5,f4:'vkorg'},{id:'vtweg',l:'Distribution Channel',w:3,f4:'vtweg'},{id:'spart',l:'Division',w:3,f4:'spart'}]}],
+  expect:{auart:{eq:'OR',idn:'Order standar = OR (Standard Order).'},vkorg:'1000',vtweg:{eq:'10',idn:'Modern trade = channel 10.'},spart:'00'},hints:{auart:'F4 → Standard Order',vtweg:'Modern trade'}},
+ {title:'Create Standard Order: Overview',go:'save',
+  blocks:[{t:'group',title:'',fields:[{id:'kunnr',l:'Sold-To Party',w:10,f4:'kunnr'},{id:'kunwe',l:'Ship-To Party',w:10,f4:'kunnr'},{id:'bstkd',l:'Cust. Reference',w:20},{id:'vdatu',l:'Req. deliv.date',w:10}]},
+   {t:'items',key:'it',title:'All Items',rows:3,cols:[{id:'itm',l:'Item',ro:1,v:r=>(r+1)*10},{id:'mat',l:'Material',w:9,f4:'matfg'},{id:'qty',l:'Order Quantity',w:6},{id:'un',l:'SU',ro:1},{id:'txt',l:'Description',ro:1},{id:'net',l:'Net value',ro:1}]}],
+  onEnter:v=>{const out={};if(v.kunnr&&!v.kunwe)out.kunwe=v.kunnr;const m=v['it.0.mat'];
+   if(m){const f=FG[norm(m)];if(!f)return {msg:['E',`Material ${m} is not defined for sales org.1000, distr.chan.10, language EN`],explain:'Material tidak ada di sales area ini. Pakai F4.'};
+    out['it.0.txt']=f.d;out['it.0.un']=f.u;const q=numv(v['it.0.qty']);if(q>0)out['it.0.net']=(q*f.p).toLocaleString('id-ID');}
+   return {fill:out,msg:out['it.0.net']?['S','Pricing carried out: PR00 96.000 IDR / CAR']:null,explain:out.kunwe&&!v.kunwe?{t:'i',m:'SAP mengisi ship-to sama dengan sold-to. Brief meminta kirim ke DC Cibitung, jadi ubah ke 200146.'}:null};},
+  expect:{kunnr:'200145',kunwe:{eq:'200146',idn:'Barang dikirim ke DC Cibitung (ship-to 200146), bukan ke kantor pusat.'},bstkd:{eq:'PO-SR-7781',idn:'Nomor PO customer wajib diisi di Cust. Reference agar invoice diterima customer.'},vdatu:{eq:'18.11.2026',idn:'Tanggal kirim dari brief: 18.11.2026.'},'it.0.mat':'500010','it.0.qty':'120','it.0.txt':NEED_ENTER('material')},
+  hints:{kunnr:'Kantor pusat',kunwe:'DC Cibitung','it.0.mat':'F4 → biskuit kelapa'},ok:'Standard Order 10000871 has been saved'}]},
+{k:'q',instr:'Order 10000871 tersimpan. Siapa yang akan menerima tagihan dan siapa yang menerima barang?',o:['Tagihan ke 200145 (kantor pusat), barang ke 200146 (DC Cibitung)','Keduanya ke 200146','Keduanya ke 200145','Tagihan ke DC, barang ke kantor pusat'],a:0,e:'Partner function memisahkan sold-to/bill-to/payer dengan ship-to.'},
+{k:'q',instr:'Apa fungsi Cust. Reference PO-SR-7781?',o:['Mencatat nomor PO customer agar invoice cocok dengan dokumen mereka','Nomor dokumen SAP otomatis','Kode diskon','Nomor delivery'],a:0,e:'Banyak customer modern trade menolak invoice tanpa nomor PO mereka.'}
+]},
+{id:'d2',title:'Kirim & tagih order (VL01N → VF01)',mod:'sd',lvl:'Lanjut',
+brief:{from:'Pak Dimas, Supervisor Gudang FG',msg:'Order 10000871 PT Sumber Retail sudah di-pick lengkap 120 karton dan truk siap. Tolong buat delivery dari shipping point 1100, isi picked qty, lalu Post Goods Issue. Setelah itu buatkan billing-nya.'},
+steps:[
+{k:'tx',tc:'VL01N',instr:'Buka VL01N, isi shipping point dan nomor order, Enter. Isi Picked Qty, lalu klik Post Goods Issue.',
+screens:[
+ {title:'Create Outbound Delivery with Order Reference',go:'enter',def:{ledat:TODAY},blocks:[{t:'group',title:'',fields:[{id:'vstel',l:'Shipping Point',w:5,f4:'vstel'},{id:'ledat',l:'Selection Date',w:10}]},{t:'group',title:'Sales Order Data',fields:[{id:'vbeln',l:'Order',w:10,f4:'vbeln'}]}],
+  expect:{vstel:'1100',vbeln:{eq:'10000871',idn:'Nomor order dari brief: 10000871 (F4).'}},hints:{vbeln:'F4 → PT Sumber Retail'}},
+ {title:'Outbound Delivery Create: Overview',go:'save',saveLabel:'Post Goods Issue',blocks:[{t:'kv',rows:[['Ship-To Party','200146 PT Sumber Retail – DC Cibitung'],['Planned GI','17.11.2026'],['Delivery date','18.11.2026']]},
+   {t:'items',key:'dl',title:'Item Overview · Picking',rows:1,cols:[{id:'itm',l:'Item',ro:1,v:()=>'10'},{id:'mat',l:'Material',ro:1,v:()=>'500010'},{id:'txt',l:'Description',ro:1,v:()=>'BISKUIT KELAPA 200G (KARTON)'},{id:'qty',l:'Deliv. Qty',ro:1,v:()=>'120'},{id:'un',l:'SU',ro:1,v:()=>'CAR'},{id:'sloc',l:'SLoc',ro:1,v:()=>'1001'},{id:'pikmg',l:'Picked Qty',w:6}]}],
+  expect:{'dl.0.pikmg':{eq:'120',idn:'Picked qty harus sama dengan delivery qty (120) sebelum PGI. Kalau kurang, SAP tidak mengizinkan goods issue untuk qty penuh.'}},hints:{'dl.0.pikmg':'Sama dengan Deliv. Qty'},ok:'Outbound Delivery 80001542 has been saved'}]},
+{k:'q',instr:'Apa yang terjadi di sistem saat Post Goods Issue?',o:['Stok FG di sloc 1001 berkurang 120 CAR (mvt 601) dan HPP terposting di FI','Customer langsung ditagih','PO ke vendor dibuat','Tidak ada perubahan stok'],a:0,e:'PGI = movement type 601: stok berkurang dan dokumen akuntansi HPP vs persediaan terbentuk.'},
+{k:'tx',tc:'VF01',instr:'Buka VF01, isi nomor delivery di baris pertama, Enter. Periksa payer dan nilai, lalu Save.',
+screens:[
+ {title:'Create Billing Document',go:'enter',blocks:[{t:'items',key:'bd',title:'Documents to be processed',rows:3,cols:[{id:'doc',l:'Document',w:10,f4:'vbelnd'}]}],expect:{'bd.0.doc':{eq:'80001542',idn:'Billing dibuat dari delivery 80001542 (bukan dari nomor order).'}},hints:{'bd.0.doc':'Nomor delivery dari langkah sebelumnya'}},
+ {title:'Invoice (F2) Create: Overview of Billing Items',go:'save',blocks:[{t:'kv',rows:[['Payer','200145 PT Sumber Retail – Kantor Pusat'],['Billing Date','04.11.2026'],['Net Value','11.520.000 IDR'],['Tax Amount (PPN 11%)','1.267.200 IDR']]},
+   {t:'table',title:'Billing items',h:['Item','Material','Description','Billed Qty','SU','Net value'],r:[['10','500010','BISKUIT KELAPA 200G (KARTON)','120','CAR','11.520.000']]}],ok:'Document 90003310 has been saved'}]},
+{k:'q',instr:'Setelah billing 90003310 disimpan, piutang tercatat atas nama siapa dan berapa nilainya?',o:['Customer 200145 sebesar Rp 12.787.200 (net + PPN)','Customer 200146 sebesar Rp 11.520.000','Vendor 100230','Belum ada piutang sampai customer bayar'],a:0,e:'Billing memposting piutang ke payer: 11.520.000 + 1.267.200 = 12.787.200.'}
+]},
+{id:'f1',title:'Posting invoice vendor tanpa PO (FB60)',mod:'fi-ap',lvl:'Menengah',
+brief:{from:'Bu Ratna, Finance AP Lead',msg:'Tolong posting invoice PT Lift Prima (vendor 100230) no. INV-LP-0911 tanggal 03.11.2026, sewa forklift November Rp 15.000.000 (tanpa PPN untuk latihan ini). Bebankan ke akun 610300 beban sewa peralatan, cost center Gudang FG 11WH100.'},
+steps:[
+{k:'tx',tc:'FB60',instr:'Buka FB60. Isi data header (vendor, tanggal invoice, amount, reference), lalu baris G/L: akun, amount, cost center. Pastikan saldo nol, lalu Post.',
+screens:[{title:'Enter Vendor Invoice: Company Code 1000',go:'save',saveLabel:'Post',def:{budat:TODAY},
+ blocks:[{t:'group',title:'Basic data',fields:[{id:'lifnr',l:'Vendor',w:10,f4:'lifnr'},{id:'bldat',l:'Invoice date',w:10},{id:'budat',l:'Posting Date',w:10},{id:'wrbtr',l:'Amount',w:14},{id:'xblnr',l:'Reference',w:16},{id:'sgtxt',l:'Text',w:30}]},
+  {t:'items',key:'gl',title:'Items',rows:2,cols:[{id:'saknr',l:'G/L acct',w:8,f4:'saknr'},{id:'dc',l:'D/C',ro:1,v:()=>'Debit'},{id:'amt',l:'Amount in doc.curr.',w:12},{id:'kostl',l:'Cost center',w:9,f4:'kostl'}]}],
+ expect:{lifnr:'100230',bldat:{eq:'03.11.2026',idn:'Invoice date = tanggal di dokumen vendor (03.11.2026).'},wrbtr:AMT(15000000,'Amount header = total tagihan vendor, Rp 15.000.000.'),xblnr:{eq:'INV-LP-0911',idn:'Nomor invoice vendor di Reference mencegah invoice yang sama diposting dua kali.'},
+  'gl.0.saknr':{eq:'610300',idn:'Sewa peralatan = 610300 (F4).'},'gl.0.amt':AMT(15000000,'Total baris G/L harus sama dengan amount header. Indikator saldo harus nol sebelum Post.','Balance in transaction currency'),'gl.0.kostl':{eq:'11WH100',idn:'Akun beban butuh cost center. Gudang FG = 11WH100.'}},
+ hints:{lifnr:'F4 → Lift Prima','gl.0.saknr':'F4 → sewa','gl.0.kostl':'F4 → Gudang FG'},ok:'Document 1900004512 was posted in company code 1000'}]},
+{k:'q',instr:'Payment terms vendor ini 30 hari dari invoice date. Kapan invoice jatuh tempo?',o:['03.12.2026','04.12.2026','03.11.2026','30.11.2026'],a:0,e:'03.11.2026 + 30 hari = 03.12.2026. F110 akan mengambilnya pada payment run yang melewati tanggal itu.'},
+{k:'q',instr:'Kenapa invoice ini memakai FB60, bukan MIRO?',o:['Tidak ada PO; sewa bulanan dibebankan langsung ke akun biaya dan cost center','FB60 lebih cepat','MIRO hanya untuk impor','Vendor tidak punya NPWP'],a:0,e:'MIRO untuk invoice dengan referensi PO (3-way match). Tanpa PO → FB60.'}
+]},
+{id:'f2',title:'Bayar vendor manual & cek sisa hutang (F-53, FBL1N)',mod:'fi-ap',lvl:'Lanjut',
+brief:{from:'Bu Ratna, Finance AP Lead',msg:'PT Lift Prima minta pembayaran INV-LP-0911 (Rp 15.000.000) hari ini lewat Bank Mandiri (akun 111210). Jangan ikut bayar INV-LP-0870, masih dispute jam operasi. Setelah itu cek berapa sisa hutang kita ke vendor ini.'},
+steps:[
+{k:'tx',tc:'F-53',instr:'Buka F-53. Isi bank, amount, dan vendor di Open item selection, lalu klik Process Open Items (Enter). Pilih hanya invoice yang dibayar, lalu Post.',
+screens:[
+ {title:'Post Outgoing Payments: Header Data',go:'enter',def:{bldat:TODAY,budat:TODAY,bukrs:'1000',blart:'KZ'},
+  blocks:[{t:'group',title:'',fields:[{id:'bldat',l:'Document Date',w:10},{id:'blart',l:'Type',t:'ro'},{id:'bukrs',l:'Company Code',w:5},{id:'budat',l:'Posting Date',w:10}]},{t:'group',title:'Bank data',fields:[{id:'hkont',l:'Account',w:8,f4:'hkont'},{id:'wrbtr',l:'Amount',w:14}]},{t:'group',title:'Open item selection',fields:[{id:'agkon',l:'Account',w:10,f4:'lifnr'},{id:'agkoa',l:'Account Type',t:'ro'}]}],
+  onEnter:()=>({fill:{agkoa:'K'}}),
+  expect:{hkont:{eq:'111210',idn:'Bank Mandiri outgoing = 111210.'},wrbtr:AMT(15000000,'Amount pembayaran = Rp 15.000.000.'),agkon:{eq:'100230',idn:'Vendor yang dibayar: PT Lift Prima 100230.'}},hints:{hkont:'F4 → Mandiri',agkon:'F4 → Lift Prima'}},
+ {title:'Post Outgoing Payments Process open items',go:'save',saveLabel:'Post',blocks:[{t:'kv',rows:[['Entered','15.000.000 IDR'],['Assigned','dihitung dari item yang dipilih'],['Not assigned','harus 0 sebelum Post']]},
+   {t:'items',key:'op',title:'Open items · Vendor 100230',rows:2,cols:[{id:'sel',l:'Select',t:'chk'},{id:'belnr',l:'Document',ro:1,v:r=>['1900004512','1900004377'][r]},{id:'xblnr',l:'Reference',ro:1,v:r=>['INV-LP-0911','INV-LP-0870'][r]},{id:'bldat',l:'Doc. Date',ro:1,v:r=>['03.11.2026','06.10.2026'][r]},{id:'amt',l:'Net amount',ro:1,v:r=>['15.000.000','12.500.000'][r]}]}],
+  expect:{'op.0.sel':{eq:true,sap:'Difference too large for clearing',idn:'Pilih INV-LP-0911 supaya pembayaran 15 jt ter-assign. Not assigned harus 0.'},'op.1.sel':{eq:false,sap:'Difference too large for clearing',idn:'INV-LP-0870 masih dispute dan tidak dibayar. Jika ikut dipilih, assigned 27,5 jt tidak sama dengan entered 15 jt.'}},ok:'Document 1500003321 was posted in company code 1000'}]},
+{k:'tx',tc:'FBL1N',instr:'Buka FBL1N untuk vendor 100230, company code 1000, Open items. Execute, lalu hitung total dengan Σ di kolom Amount in LC.',
+screens:[
+ {title:'Vendor Line Item Display',sel:1,go:'exec',def:{bukrs:'1000',xopsel:true},blocks:[{t:'group',title:'Vendor selection',fields:[{id:'lifnr',l:'Vendor account',w:10,f4:'lifnr',to:1},{id:'bukrs',l:'Company code',w:5,to:1}]},{t:'group',title:'Line item selection',fields:[{id:'xopsel',l:'Open items',t:'chk'},{id:'xclsel',l:'Cleared items',t:'chk'},{id:'xaisel',l:'All items',t:'chk'}]}],
+  expect:{lifnr:'100230',bukrs:'1000'},hints:{lifnr:'Lift Prima'}},
+ {title:'Vendor Line Item Display',goal:s=>(s.alv.op||{}).sum==='val',goalMsg:'Total hutang terbuka dihitung dengan Σ',blocks:[{t:'alv',key:'op',data:ALV_FBL1N}]}]},
+{k:'q',instr:'Berapa sisa hutang terbuka ke PT Lift Prima, dan kenapa INV-LP-0870 punya payment block R?',o:['Rp 20.000.000; R = diblok karena masih diperiksa (dispute) sehingga F110 tidak membayarnya','Rp 35.000.000; R = sudah dibayar','Rp 7.500.000; R = retur barang','Rp 12.500.000; R = reversal'],a:0,e:'12,5 jt + 7,5 jt = 20 jt. Invoice 0911 sudah cleared oleh F-53 sehingga tidak muncul lagi di open items.'}
+]},
+{id:'p1',title:'Baca kebutuhan material di MD04',mod:'pp',lvl:'Menengah',
+brief:{from:'Pak Yoga, Kepala PPIC',msg:'Produksi biskuit minggu depan naik. Tolong cek situasi gula pasir (400020) di plant 1100: kapan stoknya mulai tidak cukup, dan apa yang harus kita minta ke purchasing?'},
+steps:[
+{k:'tx',tc:'MD04',instr:'Buka MD04, isi material dan plant, Enter. Baca kolom Available qty dan Exception.',
+screens:[
+ {title:'Stock/Requirements List: Initial Screen',go:'enter',blocks:[{t:'group',title:'Individual Access',fields:[{id:'matnr',l:'Material',w:10,f4:'matpp'},{id:'werks',l:'Plant',w:5,f4:'werks'}]}],expect:{matnr:{eq:'400020',idn:'Gula pasir = 400020 (F4).'},werks:'1100'},hints:{matnr:'F4 → gula'}},
+ {title:'Stock/Requirements List as of 09:42 hrs',blocks:[{t:'kv',rows:[['Material','400020 GULA PASIR'],['MRP type','PD  MRP'],['Plant','1100'],['Base Unit','KG']]},
+   {t:'table',title:'Receipts / requirements',h:['Date','MRP element','MRP element data','Rec./reqd qty','Available qty','Exception'],r:[['04.11.2026','Stock','','','8.000',''],['06.11.2026','OrdRes','1000452/0010','-6.000','2.000',''],['10.11.2026','DepReq','0000031207 PlOrd.','-5.000','-3.000',''],['12.11.2026','POitem','4500021960/00010','10.000','7.000','10 Reschedule in'],['16.11.2026','DepReq','0000031215 PlOrd.','-4.000','3.000','']]}]}]},
+{k:'q',instr:'Kapan stok gula pertama kali tidak cukup?',o:['10.11.2026 (available -3.000 KG)','06.11.2026','12.11.2026','Tidak pernah kurang'],a:0,e:'Setelah kebutuhan planned order 31207 pada 10.11, available menjadi -3.000 KG.'},
+{k:'q',instr:'Exception "Reschedule in" pada PO 4500021960 artinya dan tindak lanjutnya?',o:['PO datang terlambat dari kebutuhan; minta purchasing memajukan pengiriman ke ≤ 10.11.2026','PO harus dibatalkan','Stok berlebih, tunda PO','Ubah BOM biskuit'],a:0,e:'Reschedule in = majukan tanggal penerimaan agar tidak terjadi kekurangan.'}
+]},
+{id:'p2',title:'Buat production order (CO01)',mod:'pp',lvl:'Menengah',
+brief:{from:'Pak Yoga, Kepala PPIC',msg:'Buatkan production order standar untuk 2.400 karton Biskuit Kelapa 200g (500010) di plant 1100, harus selesai 13.11.2026.'},
+steps:[
+{k:'tx',tc:'CO01',instr:'Buka CO01, isi material, plant, order type, Enter. Di header isi total qty dan tanggal selesai, Enter untuk penjadwalan, lalu Save.',
+screens:[
+ {title:'Production order Create: Initial Screen',go:'enter',blocks:[{t:'group',title:'',fields:[{id:'matnr',l:'Material',w:10,f4:'matpp'},{id:'werks',l:'Production Plant',w:5,f4:'werks'},{id:'auart',l:'Order Type',w:5,f4:'auartpp'}]}],
+  expect:{matnr:'500010',werks:'1100',auart:{eq:'PP01',idn:'Order produksi standar = PP01.'}},hints:{matnr:'F4 → biskuit kelapa'}},
+ {title:'Production order Create: Header',go:'save',blocks:[{t:'kv',rows:[['Material','500010 BISKUIT KELAPA 200G (KARTON)'],['Status','CRTD MANC NMAT']]},
+   {t:'group',title:'Quantities',fields:[{id:'gamng',l:'Total Qty',w:8},{id:'gmein',l:'Unit',t:'ro'}]},{t:'group',title:'Dates/Times',fields:[{id:'gltrp',l:'Finish (Basic)',w:10},{id:'gstrp',l:'Start (Basic)',t:'ro'},{id:'term',l:'Scheduling type',t:'ro'}]}],
+  def:{gmein:'CAR',term:'Backwards'},onEnter:v=>v.gltrp&&dParse(v.gltrp)?{fill:{gstrp:'11.11.2026'},msg:['S','Scheduling carried out (backwards)']}:null,
+  expect:{gamng:AMT(2400,'Total qty dari brief: 2.400 karton.'),gltrp:{eq:'13.11.2026',idn:'Tanggal selesai dari brief: 13.11.2026.'}},ok:'Order number 1000468 saved'}]},
+{k:'q',instr:'Order 1000468 berstatus CRTD. Apa yang harus terjadi sebelum gudang bisa mengeluarkan bahan dan operator bisa konfirmasi?',o:['Order di-release (status REL)','Order di-TECO','Billing dibuat','Tidak perlu apa-apa'],a:0,e:'GI 261 dan konfirmasi CO11N membutuhkan status REL.'},
+{k:'q',instr:'Dengan scheduling backwards, kenapa start date terisi 11.11.2026?',o:['SAP menghitung mundur dari tanggal selesai berdasarkan waktu di routing','Karena hari ini 11.11','Tanggal acak','Karena customer meminta'],a:0,e:'Backward scheduling: start = finish dikurangi lead time produksi.'}
+]},
+{id:'w1',title:'Transfer order antar bin (LT01 → LT12)',mod:'wm',lvl:'Menengah',
+brief:{from:'Pak Dimas, Supervisor Gudang FG',msg:'Area picking Biskuit Kelapa (500010) hampir kosong. Pindahkan 40 karton dari rak tinggi (storage type 001, bin 001-02-03) ke area picking (type 002, bin P-01-04) di warehouse 110, plant 1100 sloc 1001. Setelah barang dipindah, konfirmasi TO-nya.'},
+steps:[
+{k:'tx',tc:'LT01',instr:'Buka LT01. Isi warehouse, movement type 999, material, qty, plant/sloc, Enter. Isi source dan destination, lalu Save.',
+screens:[
+ {title:'Create Transfer Order: Initial Screen',go:'enter',blocks:[{t:'group',title:'',fields:[{id:'lgnum',l:'Warehouse Number',w:4,f4:'lgnum'},{id:'bwlvs',l:'Movement Type',w:4,f4:'bwlvs'}]},{t:'group',title:'Material',fields:[{id:'matnr',l:'Material',w:10,f4:'matpp'},{id:'anfme',l:'Requested Qty',w:6},{id:'werks',l:'Plant / Storage Loc.',w:5,f4:'werks'},{id:'lgort',l:'Storage Location',w:5,f4:'lgort'}]}],
+  expect:{lgnum:'110',bwlvs:{eq:'999',idn:'Pemindahan manual antar bin memakai movement type WM 999.'},matnr:'500010',anfme:'40',werks:'1100',lgort:'1001'},hints:{bwlvs:'F4 → Manual stock transfer',lgort:'Gudang Barang Jadi'}},
+ {title:'Create Transfer Order: Generate 1 Items',go:'save',blocks:[{t:'group',title:'Source data (From)',fields:[{id:'vltyp',l:'Storage Type',w:4,f4:'lgtyp'},{id:'vlpla',l:'Storage Bin',w:10}]},{t:'group',title:'Destination data (To)',fields:[{id:'nltyp',l:'Storage Type',w:4,f4:'lgtyp'},{id:'nlpla',l:'Storage Bin',w:10}]}],
+  expect:{vltyp:'001',vlpla:'001-02-03',nltyp:'002',nlpla:{eq:'P-01-04',idn:'Tujuan area picking: bin P-01-04.'}},ok:'Transfer order 0000004711 created'}]},
+{k:'tx',tc:'LT12',instr:'Barang sudah dipindah fisik. Buka LT12, isi nomor TO dan warehouse, Enter. Isi actual qty, lalu Save.',
+screens:[
+ {title:'Confirm Transfer Order: Initial Screen',go:'enter',blocks:[{t:'group',title:'',fields:[{id:'tanum',l:'Transfer Order Number',w:10,f4:'tanum'},{id:'lgnum',l:'Warehouse Number',w:4,f4:'lgnum'}]}],expect:{tanum:{eq:'4711',idn:'Nomor TO dari langkah sebelumnya (F4).'},lgnum:'110'}},
+ {title:'Confirm Transfer Order: Overview',go:'save',blocks:[{t:'items',key:'to',title:'Items',rows:1,cols:[{id:'itm',l:'Item',ro:1,v:()=>'0001'},{id:'mat',l:'Material',ro:1,v:()=>'500010'},{id:'src',l:'Source',ro:1,v:()=>'001 / 001-02-03'},{id:'dst',l:'Destination',ro:1,v:()=>'002 / P-01-04'},{id:'qty',l:'Source target qty',ro:1,v:()=>'40'},{id:'act',l:'Dest. actual qty',w:6}]}],
+  expect:{'to.0.act':{eq:'40',idn:'Isi qty yang benar-benar dipindah: 40 CAR.'}},ok:'Transfer order 0000004711 confirmed'}]},
+{k:'q',instr:'Apa akibatnya jika TO tidak dikonfirmasi padahal barang sudah dipindah?',o:['Sistem masih mencatat 40 CAR di bin 001-02-03 sehingga picker dan laporan stok per bin salah','Stok plant berkurang 40','PO otomatis dibuat','Tidak ada akibat'],a:0,e:'Konfirmasi TO yang memindahkan quant di sistem.'}
+]},
+{id:'w2',title:'Cari bin untuk picking FIFO (LX02)',mod:'wm',lvl:'Dasar',
+brief:{from:'Pak Dimas, Supervisor Gudang FG',msg:'Ada delivery 200 karton Biskuit Kelapa (500010). Gudang memakai FIFO. Tolong cek stok per bin di warehouse 110 dan tentukan bin rak tinggi mana yang diambil duluan.'},
+steps:[
+{k:'tx',tc:'LX02',instr:'Buka LX02, isi warehouse dan material, Execute. Sort kolom GR Date ascending.',
+screens:[
+ {title:'Stock List',sel:1,go:'exec',blocks:[{t:'group',title:'',fields:[{id:'lgnum',l:'Warehouse Number',w:4,f4:'lgnum'},{id:'lgtyp',l:'Storage Type',w:4,f4:'lgtyp',to:1},{id:'matnr',l:'Material',w:10,f4:'matpp',to:1}]}],expect:{lgnum:'110',matnr:'500010'}},
+ {title:'Stock List',blocks:[{t:'alv',key:'bin',data:ALV_LX02}]}]},
+{k:'q',instr:'Dengan FIFO, bin rak tinggi mana yang diambil pertama?',o:['001-05-01 (GR 15.10.2026, 240 CAR)','001-07-02 (GR terbaru)','001-02-03','P-01-04'],a:0,e:'FIFO = barang yang paling lama diterima keluar lebih dulu.'},
+{k:'q',instr:'Berapa total stok 500010 di warehouse 110?',o:['640 CAR','600 CAR','400 CAR','200 CAR'],a:0,e:'160 + 240 + 200 + 40 = 640 CAR.'}
+]}
+);
 /* ===================== SIMULATOR ENGINE ===================== */
 let SIM=null; let LOGGED=false; const LOGON_USER='ANDRE.P';
 const stepOf=()=>SIM&&!SIM.free?SIM.sc.steps[SIM.step]:null;
@@ -1993,7 +2972,7 @@ function logonH(){
    <div class="fld"><label for="lv_user">User</label><div class="inp">${inp('user','text',14)}</div></div>
    <div class="fld"><label for="lv_pw">Password</label><div class="inp">${inp('pw','password',14)}</div></div><div class="sp"></div>
    <div class="fld"><label for="lv_lang">Logon Language</label><div class="inp">${inp('lang','text',4)}</div></div></div>
-   <div class="info-box"><div class="h">Information</div><div class="b">Welcome to the PRD training system (simulation).<br><br>Akademi SAP Admin Proyek · client 800.<br>Data di sistem ini fiktif. Jangan memakai user/password kantor yang asli.</div></div></div>`;
+   <div class="info-box"><div class="h">Information</div><div class="b">Welcome to the PRD training system (simulation).<br><br>Akademi SAP · client 800.<br>Data di sistem ini fiktif. Jangan memakai user/password kantor yang asli.</div></div></div>`;
 }
 function guiBodyH(){
   if(SIM.where==='logon') return logonH();
@@ -2042,7 +3021,7 @@ function drawSim(){
   const a=document.activeElement; const focusId=a&&a.dataset?(a.dataset.f||(a.dataset.lv?'lv:'+a.dataset.lv:null)||a.id):null; const selPos=a&&(a.type==='text')?a.selectionStart:null;
   computeNext();
   const v=$('#view');
-  v.innerHTML=`<div class="spread"><div><div class="eyebrow">${SIM.free?'Simulator SAP GUI · Mode bebas':SIM.sc.kase?'Studi kasus + praktik SAP · Modul '+SIM.sc.mod:'Simulator SAP GUI · Modul '+SIM.sc.mod}</div><h1 style="font-size:28px">${esc(SIM.sc.title)}</h1></div><a class="btn ghost sm" href="#${SIM.sc.kase?'studi-kasus':'simulator'}" id="simExit">← ${SIM.sc.kase?'Studi kasus':'Daftar skenario'}</a></div>
+  v.innerHTML=`<div class="spread"><div><div class="eyebrow">${SIM.free?'Simulator SAP GUI · Mode bebas':SIM.sc.kase?'Studi kasus + praktik SAP · '+MOD[SIM.sc.mod].code:'Simulator SAP GUI · '+MOD[SIM.sc.mod].code}</div><h1 style="font-size:28px">${esc(SIM.sc.title)}</h1></div><a class="btn ghost sm" href="#${SIM.sc.kase?'studi-kasus':'simulator'}" id="simExit">← ${SIM.sc.kase?'Studi kasus':'Daftar skenario'}</a></div>
   <div class="sim-layout" style="margin-top:14px">
     <div class="coach" id="coach">${coachH()}</div>
     <div class="gui ${S.simMode==='guided'?'guided':''}" id="gui">
@@ -2144,16 +3123,20 @@ document.addEventListener('keydown',e=>{
 });
 function renderSimHome(){
   SIM=null;
-  const byMod={};SIMS.filter(s=>!s.kase).forEach(s=>(byMod[s.mod]=byMod[s.mod]||[]).push(s));
-  const done=SIMS.filter(s=>!s.kase&&simStars(s.id)>0).length;
+  const list=SIMS.filter(s=>!s.kase);const done=list.filter(s=>simStars(s.id)>0).length;const byMod={};list.forEach(s=>(byMod[s.mod]=byMod[s.mod]||[]).push(s));
+  const r=roleOf();const mods=MODULES.filter(m=>byMod[m.id]);
+  const mine=r?mods.filter(m=>relOf(m.id,r)):[];const other=mods.filter(m=>!mine.includes(m));
+  const sec=m=>`<h3 style="margin:22px 0 8px;font-size:18px;font-weight:500">${esc(m.code)} · ${esc(m.title)} ${relPill(relOf(m.id))}</h3><div class="scen-list">${byMod[m.id].map(simCard).join('')}</div>`;
   $('#view').innerHTML=`<div class="eyebrow">Praktik</div><h1>Simulator SAP GUI</h1>
-  <p class="lead">${SIMS.filter(s=>!s.kase).length} skenario latihan dengan tampilan seperti SAP GUI: layar logon, menu bar, toolbar, command field, title bar, tab, table control, popup F4, ALV, dan status bar. Setiap skenario diawali permintaan nyata dari rekan kerja. Selesai: <b>${done}/${SIMS.filter(s=>!s.kase).length}</b>.</p>
+  <p class="lead">${list.length} skenario latihan dengan tampilan seperti SAP GUI: layar logon, menu bar, toolbar, command field, title bar, tab, table control, popup F4, ALV, dan status bar. Setiap skenario diawali permintaan nyata dari rekan kerja. Selesai: <b>${done}/${SIMS.filter(s=>!s.kase).length}</b>.</p>
   <div class="card" style="margin-top:14px;border:2px solid var(--accent)"><div class="spread"><div><div class="eyebrow">Mode bebas</div><b style="font-family:var(--font-d);font-size:20px">Latihan SAP sesukamu, tanpa skenario</b><p style="margin:4px 0 0;max-width:70ch">Sistem latihan dengan data yang saling terhubung: buat PR, setujui jadi PO, terima barang, keluarkan ke proyek, pindahkan stok, batalkan dokumen, lalu lihat dampaknya di stok dan biaya proyek. SAP akan menolak isian yang salah seperti aslinya.</p></div><button class="btn" id="freeBtn">Buka Mode bebas</button></div></div>
   <div class="grid g2" style="margin-top:12px">
    <div class="callout" style="margin:0"><b>Cara main</b>Login sekali per sesi browser (client 800). Ketik T-code di command field (contoh <code>ME51N</code>, dari dalam transaksi <code>/nMIGO</code>) atau double-click di Favorites/SAP Menu. Shortcut: <code>Enter</code>, <code>F8</code>, <code>Ctrl+S</code>, <code>F3</code>, <code>F4</code>, <code>F12</code>, <code>Shift+F5</code>. Menu <b>System → Status</b> juga berfungsi.</div>
    <div class="callout warn" style="margin:0"><b>Dua mode</b>Panduan: checklist field, sorotan field berikutnya, label di toolbar ALV, penjelasan pesan. Ujian: tanpa bantuan dan ikon saja, seperti di SAP asli.</div>
   </div>
-  ${Object.keys(byMod).sort((a,b)=>a-b).map(m=>`<h2>Modul ${m}: ${esc(MODULES[m-1].title)}</h2><div class="scen-list">${byMod[m].map(simCard).join('')}</div>`).join('')}
+  
+  ${r?`<h2>Untuk jalur ${esc(r.t)}</h2>${mine.length?mine.map(sec).join(''):'<p class="muted">Belum ada skenario simulator untuk modul jalurmu. Modul teknis dan cloud dipelajari lewat materi dan kuis.</p>'}<h2>Modul lain</h2>`:'<h2>Semua skenario per modul</h2>'}
+  ${other.map(sec).join('')}
   <p class="muted" style="font-size:13px;margin-top:22px">Simulator meniru alur dan susunan layar SAP GUI dengan ikon buatan sendiri. Detail tampilan bisa berbeda di sistem perusahaanmu (ECC/S/4HANA, tema GUI, layout yang dikustomisasi). Latihan pada sistem asli tetap paling baik di client QAS/training.</p>`;
   bindSimCards();
   $('#freeBtn').onclick=()=>startFree();
@@ -2168,92 +3151,165 @@ function mastery(m){
   const pct=Math.round(les/L*50+(q>=80?30:q/80*30*0.5)+(sims.length?(prac?20:0):20*(les>=L&&q>=80?1:0)));
   return {L,les,q,qok:q>=80,prac,hasSim:sims.length>0,sims,done:les>=L&&q>=80&&prac,pct};
 }
+function roleCore(r){return [...new Set([...r.g.filter(x=>x==='nav'||x==='org'),...r.w,...r.g])];}
 function progress(){
-  const ms=MODULES.map(mastery); const mods=ms.filter(x=>x.done).length;
-  const s=SIMS.filter(x=>simStars(x.id)>0).length, c=Object.keys(S.cases).length, k=Object.values(S.cards).filter(Boolean).length, q=S.quiz.best||0;
-  const pct=Math.round(ms.reduce((a,x)=>a+x.pct,0)/MODULES.length*0.7+(s/SIMS.length)*12+(c/CASES.length)*8+(Math.min(q,100)/100)*5+(k/CARDS.length)*5);
-  return {mods,s,c,k,q,pct};
+  const r=roleOf(); const core=r?roleCore(r):ORDER.slice();
+  const ms=core.map(id=>mastery(MOD[id])); const done=ms.filter(x=>x.done).length;
+  const pct=Math.round(ms.reduce((a,x)=>a+x.pct,0)/ms.length);
+  const all=MODULES.filter(m=>mastery(m).done).length;
+  const s=SIMS.filter(x=>simStars(x.id)>0).length, c=Object.keys(S.cases).length, k=Object.values(S.cards).filter(Boolean).length;
+  const q=r?((S.quiz.r||{})[r.id]||0):(S.quiz.best||0);
+  return {core:core.length,done,pct,all,s,c,k,q,r};
 }
+const shortT=m=>m.title.includes(' – ')?m.title.split(' – ').slice(1).join(' – '):m.title;
+const catName=id=>(CATS.find(c=>c.id===id)||{}).t||'';
+const durMin=ids=>ids.reduce((a,id)=>a+(parseInt(MOD[id].dur)||0),0);
+function rolesFor(mid,k){return ROLES.filter(r=>r[k].includes(mid));}
 
 /* ===================== NAV & ROUTER ===================== */
-const NAV=[
-{g:'Mulai'},{h:'beranda',t:'Beranda',n:'⌂'},
-{g:'Modul'},...MODULES.map(m=>({h:'modul-'+m.id,t:m.title,n:'M'+m.id,mod:m.id})),
-{g:'Praktik'},{h:'simulator',t:'Simulator SAP GUI',n:'SIM'},{h:'studi-kasus',t:'Studi Kasus',n:'SK'},
-{g:'Uji & hafalan'},{h:'kuis',t:'Kuis & Ujian',n:'Q'},{h:'flashcard',t:'Flashcard T-code',n:'FC'},
-{g:'Referensi'},{h:'referensi',t:'Cheat sheet',n:'REF'}
-];
 function renderNav(cur){
-  $('#nav').innerHTML=NAV.map(i=>{if(i.g)return `<div class="nav-group">${i.g}</div>`;
-    let badge=''; if(i.mod){const M=mastery(MODULES[i.mod-1]);badge=M.done?'<span class="done">✓</span>':(M.les?`<span class="part">${M.les}/${M.L}</span>`:'');}
-    if(i.h==='simulator'){const d=SIMS.filter(x=>simStars(x.id)>0).length;badge=d?`<span class="part">${d}/${SIMS.length}</span>`:'';}
-    return `<a href="#${i.h}" class="${cur===i.h?'on':''}"><span class="num">${i.n}</span><span>${i.t}</span>${badge}</a>`;}).join('');
-  const p=progress();
-  $('#sideProg').innerHTML=`<b>Progres belajar</b> <span style="float:right" class="mono">${p.pct}%</span><div class="bar"><i style="width:${p.pct}%"></i></div><div style="margin-top:6px;color:var(--muted);font-size:12px">${p.mods}/8 modul dikuasai · ${p.s}/${SIMS.length} simulasi · ${p.c}/${CASES.length} kasus</div>`;
+  const r=roleOf(), p=progress();
+  const it=(h,t,n,badge)=>`<a href="#${h}" class="${cur===h?'on':''}"><span class="num">${n}</span><span>${t}</span>${badge||''}</a>`;
+  const mb=m=>{const M=mastery(m);return M.done?'<span class="done">✓</span>':(M.les?`<span class="part">${M.les}/${M.L}</span>`:'');};
+  let h='<div class="nav-group">Mulai</div>'+it('beranda','Beranda','⌂')+it('jalur','Jalur saya','→',r?`<span class="part">${p.done}/${p.core}</span>`:'')+it('role',r?'Ganti role':'Pilih role','R')+it('modul','Katalog modul','≡',`<span class="part">${MODULES.length}</span>`);
+  if(r) h+=`<div class="nav-group">Modul jalurmu</div>`+rolePath(r).map(id=>{const m=MOD[id],k=relOf(id,r);return `<a href="#modul-${id}" class="${cur==='modul-'+id?'on':''}" title="${REL[k][0]}"><span class="rdot ${k}" aria-label="${REL[k][0]}"></span><span class="num code">${m.code}</span><span>${esc(shortT(m))}</span>${mb(m)}</a>`;}).join('');
+  else h+=`<div class="nav-group">Modul</div><a href="#role" class="${''}"><span class="num">i</span><span style="color:var(--meta)">Pilih role agar modulmu tampil di sini</span></a>`;
+  if(cur.startsWith('modul-')&&(!r||!relOf(cur.slice(6),r))){const m=MOD[cur.slice(6)];if(m)h+=`<div class="nav-group">Sedang dibuka</div><a href="#${cur}" class="on"><span class="num code">${m.code}</span><span>${esc(shortT(m))}</span>${mb(m)}</a>`;}
+  const d=SIMS.filter(x=>!x.kase&&simStars(x.id)>0).length, ns=SIMS.filter(x=>!x.kase).length;
+  h+='<div class="nav-group">Praktik</div>'+it('simulator','Simulator SAP GUI','SIM',d?`<span class="part">${d}/${ns}</span>`:'')+it('studi-kasus','Studi Kasus','SK')+
+     '<div class="nav-group">Uji & hafalan</div>'+it('kuis','Kuis & Ujian','Q')+it('flashcard','Flashcard T-code','FC')+
+     '<div class="nav-group">Referensi</div>'+it('referensi','Cheat sheet','REF');
+  $('#nav').innerHTML=h;
+  $('#sideProg').innerHTML=`<b>${r?'Jalur '+esc(r.t):'Progres belajar'}</b> <span style="float:right" class="mono">${p.pct}%</span><div class="bar"><i style="width:${p.pct}%"></i></div><div style="margin-top:6px;color:var(--muted);font-size:12px">${r?`${p.done}/${p.core} modul inti dikuasai`:`${p.all}/${MODULES.length} modul dikuasai`} · ${p.s} simulasi · ${p.c} kasus</div>`;
+  const br=$('#brandRole'); if(br) br.textContent=r?r.t:'Semua role & modul';
 }
 let MODV=null;
 function route(){
   const h=(location.hash||'#beranda').slice(1);
   if(h!=='simulator') SIM=null;
   window.scrollTo(0,0);
-  if(h.startsWith('modul-')) renderModule(+h.split('-')[1]);
+  let nav=h;
+  if(h.startsWith('modul-')){const k=h.slice(6);const m=MOD[k]||(LEG_MAP[k]&&MOD[LEG_MAP[k][0]]);if(!m){location.hash='modul';return;}if(m.id!==k){history.replaceState(null,'','#modul-'+m.id);}renderModule(m.id);nav='modul-'+m.id;}
+  else if(h.startsWith('role-')){if(!ROLES.find(r=>r.id===h.slice(5))){location.hash='role';return;}renderRoleDetail(h.slice(5));nav='role';}
+  else if(h==='role') renderRoles();
+  else if(h==='jalur'){if(!roleOf()){location.hash='role';return;}renderPath();}
+  else if(h==='modul') renderCatalog();
   else if(h==='simulator'){ if(!SIM) renderSimHome(); }
   else if(h==='kuis') renderQuizHome();
   else if(h==='flashcard') renderCards();
   else if(h==='studi-kasus') renderCaseHome();
   else if(h==='referensi') renderRef();
-  else renderHome();
-  renderNav(h.startsWith('modul-')||['simulator','kuis','flashcard','studi-kasus','referensi'].includes(h)?h:'beranda');
-  renderCrumb(h);
+  else {renderHome();nav='beranda';}
+  renderNav(nav); renderCrumb(nav);
   $('#side').classList.remove('open');
 }
 window.addEventListener('hashchange',route);
-function renderCrumb(h){const el=$('#crumb');if(!el)return;const L={simulator:'Simulator SAP GUI','studi-kasus':'Studi Kasus',kuis:'Kuis & Ujian',flashcard:'Flashcard T-code',referensi:'Cheat sheet'};
-  let cur=L[h];if(h.startsWith('modul-')){const m=MODULES.find(x=>x.id===+h.split('-')[1]);cur=m?`Modul ${m.id} · ${m.title}`:'Modul';}
-  el.innerHTML=`<a href="#beranda">Akademi SAP</a>${cur?`<span class="sep">›</span><span class="cur">${esc(cur)}</span>`:'<span class="sep">›</span><span class="cur">Beranda</span>'}`;}
+function renderCrumb(h){const el=$('#crumb');if(!el)return;const L={simulator:'Simulator SAP GUI','studi-kasus':'Studi Kasus',kuis:'Kuis & Ujian',flashcard:'Flashcard T-code',referensi:'Cheat sheet',role:'Pilih role',jalur:'Jalur saya',modul:'Katalog modul'};
+  const parts=[];const hh=(location.hash||'').slice(1);
+  if(h.startsWith('modul-')){const m=MOD[h.slice(6)];parts.push(['modul','Katalog modul'],[null,m?`${m.code} · ${shortT(m)}`:'Modul']);}
+  else if(hh.startsWith('role-')){const r=ROLES.find(x=>x.id===hh.slice(5));parts.push(['role','Pilih role'],[null,r?r.t:'']);}
+  else parts.push([null,L[h]||'Beranda']);
+  el.innerHTML=`<a href="#beranda">Akademi SAP</a>`+parts.map(([k,t])=>`<span class="sep">›</span>${k?`<a href="#${k}">${esc(t)}</a>`:`<span class="cur">${esc(t)}</span>`}`).join('');}
+
+/* ===================== SHARED PIECES ===================== */
+function mchips(M){return `<div class="mchips"><span class="pill ${M.les>=M.L?'ok':M.les?'ac':''}">Materi ${M.les}/${M.L}</span><span class="pill ${M.qok?'ok':M.q?'warn':''}">Kuis ${M.q?M.q+'%':'–'}</span>${M.hasSim?`<span class="pill ${M.prac?'ok':''}">Praktik ${M.prac?'✓':'–'}</span>`:''}</div>`;}
+function relRow(id){const m=MOD[id],M=mastery(m);return `<a class="relrow" href="#modul-${id}"><span class="c">${m.code}</span><b>${esc(shortT(m))}</b><span class="st ${M.done?'ok':''}">${M.done?'✓ Dikuasai':(M.les||M.q)?M.pct+'%':m.dur}</span></a>`;}
+function relCols(r){return `<div class="relcols">${['w','g','p'].map(k=>{const ids=r[k];const d=ids.filter(id=>mastery(MOD[id]).done).length;return `<div class="relcol"><h3>${relPill(k)} <span style="font-size:13px;color:var(--meta);font-weight:400">${d}/${ids.length} dikuasai</span></h3><p>${REL[k][2]}</p>${ids.map(relRow).join('')}</div>`;}).join('')}</div>`;}
+function roleCard(r){return `<a class="rolecard ${S.role===r.id?'on':''}" href="#role-${r.id}"><span class="row" style="justify-content:space-between"><b>${esc(r.t)}</b>${S.role===r.id?'<span class="pill ok">Jalurmu</span>':''}</span><small>${esc(r.d)}</small><span class="cnt"><span class="pill rel-w">${r.w.length} wajib</span><span class="pill rel-g">${r.g.length} general</span><span class="pill rel-p">${r.p.length} pendukung</span></span></a>`;}
+function modCard(m){const M=mastery(m),k=relOf(m.id);return `<a class="card modcard" href="#modul-${m.id}"><div class="top"><span class="code">${m.code} · ${m.dur}</span><span class="row" style="gap:4px">${relPill(k)}${M.done?'<span class="pill ok">Dikuasai</span>':''}</span></div><h3>${esc(shortT(m))}</h3><p>${m.sum}</p>${mchips(M)}<div class="bar"><i style="width:${M.pct}%"></i></div><div class="tcs">${m.tcs.slice(0,5).map(c=>/\s/.test(c)?'':tc(c)).join('')}</div></a>`;}
 
 /* ===================== HOME ===================== */
-function mchips(M){return `<div class="mchips"><span class="pill ${M.les>=M.L?'ok':M.les?'ac':''}">Materi ${M.les}/${M.L}</span><span class="pill ${M.qok?'ok':M.q?'warn':''}">Kuis ${M.q?M.q+'%':'–'}</span>${M.hasSim?`<span class="pill ${M.prac?'ok':''}">Praktik ${M.prac?'✓':'–'}</span>`:''}</div>`;}
 function renderHome(){
-  const p=progress();
-  const next=MODULES.find(m=>!mastery(m).done);
-  $('#view').innerHTML=`
-  <div class="hero">
-    <div>
-      <div class="eyebrow">Platform belajar · Operation Administration Staff – Project</div>
-      <h1>Belajar SAP sesuai pekerjaanmu sehari-hari</h1>
-      <p class="lead">Setiap modul berisi pelajaran pendek dengan cek pemahaman, kuis, dan praktik di simulator SAP GUI. Modul dianggap <b>dikuasai</b> setelah semua pelajaran lulus, kuis minimal 80%, dan satu skenario simulator selesai.</p>
-      <div class="row" style="margin-top:20px"><a class="btn pri" href="#${next?'modul-'+next.id:'kuis'}">${next?(mastery(next).les?'Lanjutkan':'Mulai')+': Modul '+next.id:'Ikuti ujian akhir'}</a><a class="btn ghost" href="#simulator">Buka simulator</a></div>
-    </div>
-    <div class="card">
-      <div class="spread"><b style="font-family:var(--font-d);font-size:18px">Progresmu</b><span class="pill ${p.pct>=80?'ok':p.pct>=30?'warn':''}">${p.pct}%</span></div>
-      <div class="bar" style="height:10px;margin:10px 0 14px"><i style="width:${p.pct}%"></i></div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
-        <div class="stat"><b>${p.mods}/8</b><span>modul dikuasai</span></div>
-        <div class="stat"><b>${p.s}/${SIMS.length}</b><span>simulasi SAP</span></div>
-        <div class="stat"><b>${p.c}/${CASES.length}</b><span>studi kasus</span></div>
-        <div class="stat"><b>${p.q}%</b><span>ujian akhir terbaik</span></div>
-      </div>
-    </div>
-  </div>
-  <h2>Cara belajar di platform ini</h2>
-  <div class="path"><span><b>1 · PELAJARI</b>Baca satu pelajaran pendek</span><span><b>2 · CEK</b>Jawab cek pemahaman untuk membuka pelajaran berikutnya</span><span><b>3 · KUIS</b>Lulus kuis modul minimal 80%</span><span><b>4 · PRAKTIK</b>Selesaikan skenario di simulator SAP GUI</span></div>
-  <h2>Modul</h2>
-  <div class="grid g3" style="margin-top:12px">
-  ${MODULES.map(m=>{const M=mastery(m);return `<a class="card modcard" href="#modul-${m.id}"><div class="top"><span class="code">MODUL ${m.id} · ${m.dur}</span>${M.done?'<span class="pill ok">Dikuasai</span>':''}</div><h3>${m.title}</h3><p>${m.sum}</p>${mchips(M)}<div class="bar"><i style="width:${M.pct}%"></i></div><div class="tcs">${m.tcs.map(tc).join('')}</div></a>`;}).join('')}
-  </div>
-  <div class="callout warn" style="margin-top:24px"><b>Tentang data di platform ini</b>Semua nomor (PO, material, WBS, aset) adalah contoh fiktif, dan simulator meniru alur serta susunan layar SAP GUI. T-code yang dipakai adalah T-code standar. Cocokkan akses, T-code, dan kode organisasi dengan tim IT/Finance sebelum bekerja di sistem asli.</div>`;
+  const r=roleOf(), p=progress();
+  const howto=`<h2>Cara belajar di platform ini</h2><div class="path"><span><b>1 · PILIH ROLE</b>Tentukan arah karir agar modul tersaring</span><span><b>2 · PELAJARI</b>Pelajaran pendek dengan cek pemahaman</span><span><b>3 · KUIS</b>Lulus kuis modul minimal 80%</span><span><b>4 · PRAKTIK</b>Skenario di simulator SAP GUI (jika ada)</span></div>`;
+  const note=`<div class="callout warn" style="margin-top:24px"><b>Tentang data di platform ini</b>Semua nomor dokumen, material, vendor, dan customer adalah contoh fiktif. Simulator meniru alur dan susunan layar SAP GUI; T-code yang dipakai adalah T-code standar. Cocokkan akses, T-code, dan kode organisasi dengan tim IT/key user sebelum bekerja di sistem asli.</div>`;
+  if(!r){
+    $('#view').innerHTML=`<div class="hero"><div><div class="eyebrow">Platform belajar SAP · semua role</div><h1>Belajar SAP sesuai arah karirmu</h1>
+      <p class="lead">${MODULES.length} modul dari Finance, Logistik, HR, Teknis, sampai solusi cloud. Pilih role, lalu kami tunjukkan modul yang <b>wajib</b>, yang dipakai <b>general</b>, dan yang sekadar <b>pendukung</b>, supaya kamu tidak kewalahan.</p>
+      <div class="row" style="margin-top:20px"><a class="btn pri" href="#role">Pilih arah karir</a><a class="btn ghost" href="#modul">Jelajahi per modul</a></div></div>
+      <div class="card"><div class="spread"><b style="font-size:18px">Isi platform</b></div><div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+        <div class="stat"><b>${MODULES.length}</b><span>modul SAP</span></div><div class="stat"><b>${ROLES.length}</b><span>role / arah karir</span></div>
+        <div class="stat"><b>${SIMS.filter(s=>!s.kase).length}</b><span>skenario simulator</span></div><div class="stat"><b>${CASES.length+SIMS.filter(s=>s.kase).length}</b><span>studi kasus</span></div></div></div></div>
+    <h2>Pilih arah karirmu</h2><p class="muted" style="max-width:72ch">Klik role untuk melihat modul wajib, general, dan pendukungnya sebelum memilih. Kamu bisa ganti role kapan saja; progres modul tetap tersimpan.</p>
+    ${RGRP.map(([g,t])=>`<h3 style="margin:20px 0 0;font-size:17px;font-weight:500">${t}</h3><div class="rolegrid">${ROLES.filter(x=>x.grp===g).map(roleCard).join('')}</div>`).join('')}
+    ${howto}${note}`;return;}
+  const path=rolePath(r), core=roleCore(r), next=nextIn(core)||nextIn(path);
+  const cnt=k=>`${r[k].filter(id=>mastery(MOD[id]).done).length}/${r[k].length}`;
+  $('#view').innerHTML=`<div class="hero"><div><div class="eyebrow">Jalur belajar · ${esc(r.t)}</div><h1>${p.done>=p.core?'Jalur intimu selesai':'Lanjutkan jalurmu'}</h1>
+    <p class="lead">${next?`Berikutnya: <b>${next.code} · ${esc(shortT(next))}</b>. ${next.sum}`:'Semua modul di jalurmu sudah dikuasai. Kamu bebas mempelajari modul lain di katalog.'}</p>
+    <div class="row" style="margin-top:20px">${next?`<a class="btn pri" href="#modul-${next.id}">${mastery(next).les?'Lanjutkan':'Mulai'}: ${next.code}</a>`:`<a class="btn pri" href="#modul">Buka katalog modul</a>`}<a class="btn ghost" href="#jalur">Lihat jalur lengkap</a></div></div>
+    <div class="card"><div class="spread"><b style="font-size:18px">Progres jalur</b><span class="pill ${p.pct>=80?'ok':p.pct>=30?'warn':''}">${p.pct}%</span></div><div class="bar" style="height:10px;margin:10px 0 14px"><i style="width:${p.pct}%"></i></div>
+      <div class="relmini"><div>${relPill('w')}<span>${cnt('w')} modul</span></div><div>${relPill('g')}<span>${cnt('g')} modul</span></div><div>${relPill('p')}<span>${cnt('p')} modul</span></div><div><span>Ujian jalur terbaik</span><b style="color:var(--ink)">${p.q}%</b></div></div></div></div>
+  <h2>Modul untuk ${esc(r.t)}</h2><p class="muted" style="max-width:72ch">${esc(r.d)} Mulai dari dasar (general), lalu wajib, kemudian pendukung. <a href="#role-${r.id}">Lihat detail role</a> · <a href="#role">ganti role</a></p>
+  ${relCols(r)}
+  ${howto}
+  <h2>Di luar jalurmu</h2><p class="muted" style="max-width:72ch">Masih ada ${MODULES.length-path.length} modul lain. Semua bisa dibuka kapan saja, tapi kami sarankan setelah modul wajib dan general selesai.</p>
+  <div class="row"><a class="btn ghost" href="#modul">Buka katalog semua modul</a></div>${note}`;
+}
+function nextIn(ids){return ids.map(id=>MOD[id]).find(m=>!mastery(m).done);}
+
+/* ===================== ROLES ===================== */
+function renderRoles(){
+  const r=roleOf();
+  $('#view').innerHTML=`<div class="eyebrow">Arah karir</div><h1>${r?'Ganti role':'Pilih role'}</h1><p class="lead">Setiap role punya modul <b>wajib</b> (inti pekerjaan), <b>general</b> (dipakai umum sehari-hari, termasuk dasar SAP), dan <b>pendukung</b> (proses tetangga). Klik role untuk melihat detailnya.</p>
+  ${r?`<div class="outpath" style="margin-top:14px">Jalurmu sekarang: <b>${esc(r.t)}</b>. Progres modul tetap tersimpan jika kamu berganti role. <button class="btn sm ghost" id="noRole">Belajar tanpa role</button></div>`:''}
+  ${RGRP.map(([g,t])=>`<h2>${t}</h2><div class="rolegrid">${ROLES.filter(x=>x.grp===g).map(roleCard).join('')}</div>`).join('')}
+  <p class="muted" style="margin-top:22px">Role kamu tidak ada? Pilih yang paling dekat, atau <a href="#modul">jelajahi katalog per modul</a>.</p>`;
+  $('#noRole')&&($('#noRole').onclick=()=>{S.role=null;save();location.hash='modul';});
+}
+function renderRoleDetail(id){
+  const r=ROLES.find(x=>x.id===id), mine=S.role===id, core=roleCore(r);
+  const sims=SIMS.filter(s=>!s.kase&&relOf(s.mod,r)).length, cases=CASES.filter(c=>relOf(c.mod,r)).length+SIMS.filter(s=>s.kase&&relOf(s.mod,r)).length;
+  $('#view').innerHTML=`<header class="pagehero"><div class="eyebrow">Arah karir · ${RGRP.find(g=>g[0]===r.grp)[1]}</div>
+   <div class="spread" style="align-items:flex-end"><h1>${esc(r.t)}</h1>${mine?'<span class="pill ok">Jalur aktifmu</span>':''}</div><p class="lead">${esc(r.d)}</p>
+   <div class="row" style="margin-top:14px">${mine?`<a class="btn pri" href="#jalur">Buka jalurku</a>`:`<button class="btn pri" id="pickRole">Jadikan jalur saya</button>`}<a class="btn ghost" href="#role">← Semua role</a></div></header>
+  <div class="grid g3" style="margin-top:18px"><div class="stat"><b>${core.length} modul</b><span>wajib + general (± ${Math.round(durMin(core)/60*10)/10} jam)</span></div><div class="stat"><b>${r.p.length} modul</b><span>pendukung, opsional</span></div><div class="stat"><b>${sims} skenario · ${cases} kasus</b><span>praktik yang relevan</span></div></div>
+  <h2>Tugas yang biasa dikerjakan</h2><ul>${r.tasks.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
+  <h2>Modul yang perlu kamu pelajari</h2>${relCols(r)}
+  <p class="muted" style="margin-top:14px">Modul lain tetap bisa dibuka dari katalog, tapi tidak dihitung dalam progres jalur ini.</p>`;
+  $('#pickRole')&&($('#pickRole').onclick=()=>{S.role=id;save();location.hash='jalur';});
+}
+function renderPath(){
+  const r=roleOf(), p=progress(), path=rolePath(r), core=roleCore(r), next=nextIn(core)||nextIn(path);
+  $('#view').innerHTML=`<header class="pagehero"><div class="eyebrow">Jalur saya</div><div class="spread" style="align-items:flex-end"><h1>${esc(r.t)}</h1><span class="pill">${p.pct}%</span></div>
+   <p class="lead">${p.done}/${p.core} modul inti (wajib + general) dikuasai. Pendukung bersifat opsional dan bisa dipelajari setelahnya.</p>
+   <div class="row" style="margin-top:14px">${next?`<a class="btn pri" href="#modul-${next.id}">${mastery(next).les?'Lanjutkan':'Mulai'}: ${next.code}</a>`:''}<a class="btn ghost" href="#role">Ganti role</a></div></header>
+  ${p.done>=p.core?`<div class="callout" style="margin-top:18px"><b>Jalur inti selesai</b>Kamu sudah menguasai semua modul wajib dan general. Lanjutkan ke modul pendukung, ikuti ujian jalur di <a href="#kuis">Kuis & Ujian</a>, atau buka <a href="#modul">katalog</a> untuk modul lain.</div>`:''}
+  <h2>Urutan belajar yang disarankan</h2>
+  <div class="pathlist">${path.map((id,i)=>{const m=MOD[id],M=mastery(m),k=relOf(id,r);return `<a href="#modul-${id}" class="${next&&next.id===id?'next':''}"><span class="n ${M.done?'ok':''}">${M.done?'✓':i+1}</span><span class="c">${m.code}</span><span class="t"><b>${esc(shortT(m))}</b><small>${m.dur} · ${M.done?'Dikuasai':`Materi ${M.les}/${M.L} · Kuis ${M.q?M.q+'%':'–'}${M.hasSim?` · Praktik ${M.prac?'✓':'–'}`:''}`}</small></span><span class="r">${relPill(k)}</span></a>`;}).join('')}</div>
+  <h2>Praktik untuk jalur ini</h2><div class="scen-list">${SIMS.filter(s=>relOf(s.mod,r)).map(simCard).join('')||'<p class="muted">Modul di jalur ini belum punya skenario simulator. Fokus pada materi, kuis, dan flashcard.</p>'}</div>`;
+  bindSimCards();
+}
+
+/* ===================== CATALOG ===================== */
+let CATV=null;
+function renderCatalog(){
+  const r=roleOf(); if(!CATV||(!r&&CATV.f==='jalur'))CATV={f:r?'jalur':'all',q:''};
+  const draw=()=>{const q=CATV.q.toLowerCase();const hit=m=>!q||(m.code+' '+m.title+' '+m.sum+' '+m.tcs.join(' ')).toLowerCase().includes(q);
+    let body='';
+    if(CATV.f==='jalur'&&r){body=['w','g','p'].map(k=>{const ms=r[k].map(id=>MOD[id]).filter(hit);return ms.length?`<section class="catsec"><h2 style="display:flex;gap:10px;align-items:center">${relPill(k)} ${REL[k][0]}</h2><p>${REL[k][2]}</p><div class="grid g3">${ms.map(modCard).join('')}</div></section>`:'';}).join('');}
+    else body=CATS.map(c=>{const ms=MODULES.filter(m=>m.cat===c.id&&hit(m));return ms.length?`<section class="catsec"><h2>${c.t} <span style="font-size:15px;color:var(--meta);font-weight:400">${ms.length} modul</span></h2><p>${c.d}</p><div class="grid g3">${ms.map(modCard).join('')}</div></section>`:'';}).join('');
+    $('#catBody').innerHTML=body||'<p class="muted" style="margin-top:18px">Tidak ada modul yang cocok.</p>';};
+  $('#view').innerHTML=`<div class="eyebrow">Katalog</div><h1>Katalog modul SAP</h1><p class="lead">${MODULES.length} modul dalam ${CATS.length} kelompok. Setiap modul berisi 3–5 pelajaran bertahap dengan cek pemahaman, poin kunci, T-code/app penting, alur proses, integrasi, dan kuis 5 soal.</p>
+  ${r?'':`<div class="outpath" style="margin-top:14px">Belum memilih role. <a href="#role">Pilih arah karir</a> agar katalog menandai modul wajib, general, dan pendukung untukmu.</div>`}
+  <div class="chips" id="catF">${r?`<button class="chip ${CATV.f==='jalur'?'on':''}" data-f="jalur">Jalur ${esc(r.t)} (${rolePath(r).length})</button>`:''}<button class="chip ${CATV.f==='all'?'on':''}" data-f="all">Semua modul (${MODULES.length})</button></div>
+  <div class="filt"><input id="catQ" placeholder="Cari modul atau T-code, misal MIGO, FB60, payroll" value="${esc(CATV.q)}" aria-label="Cari modul" style="min-width:300px"></div>
+  <div id="catBody"></div>`;
+  $$('#catF .chip').forEach(b=>b.onclick=()=>{CATV.f=b.dataset.f;$$('#catF .chip').forEach(x=>x.classList.toggle('on',x===b));draw();});
+  $('#catQ').oninput=e=>{CATV.q=e.target.value;draw();};
+  draw();
 }
 
 /* ===================== MODULE (lesson stepper) ===================== */
 function renderModule(id){
-  const m=MODULES.find(x=>x.id===id)||MODULES[0];
+  const m=MOD[id];
   if(!MODV||MODV.id!==m.id){const M=mastery(m);MODV={id:m.id,view:M.les>=M.L?'quiz':'l'+Math.min(M.les,M.L-1)};}
   drawModule(m);
 }
+function modSeq(m){const r=roleOf();return r&&relOf(m.id,r)?rolePath(r):ORDER;}
 function drawModule(m){
-  const M=mastery(m); const v=MODV.view;
-  const prev=MODULES.find(x=>x.id===m.id-1),next=MODULES.find(x=>x.id===m.id+1);
+  const M=mastery(m); const v=MODV.view; const r=roleOf(), k=relOf(m.id,r);
+  const seq=modSeq(m), ix=seq.indexOf(m.id); const prev=MOD[seq[ix-1]], next=MOD[seq[ix+1]];
   const lockQ=M.les<M.L;
   const toc=m.lessons.map((l,i)=>{const st=i<M.les?'ok':i===M.les?'cur':'lock';return `<button data-lv="l${i}" class="${v==='l'+i?'on':''}" ${i>M.les?'disabled':''}><span class="st ${st}">${st==='ok'?'✓':''}</span><span>${i+1}. ${esc(l.t)}</span></button>`;}).join('')+
    `<div class="lt-h">Uji & praktik</div><button data-lv="quiz" class="${v==='quiz'?'on':''}" ${lockQ?'disabled':''}><span class="st ${M.qok?'ok':lockQ?'lock':'cur'}">${M.qok?'✓':''}</span><span>Kuis modul${M.q?` (${M.q}%)`:''}</span></button>`+
@@ -2261,31 +3317,36 @@ function drawModule(m){
    `<button data-lv="note" class="${v==='note'?'on':''}"><span class="st ${S.notes[m.id]?'ok':''}">${S.notes[m.id]?'✓':''}</span><span>Catatan saya</span></button>`;
   let body='';
   if(v.startsWith('l')){
-    const i=+v.slice(1), l=m.lessons[i], passed=i<M.les;
+    const i=+v.slice(1), l=m.lessons[i];
     body=`<div class="lesson-h"><h2>${i+1}. ${esc(l.t)}</h2><span class="pill">Pelajaran ${i+1} dari ${M.L}</span></div>
     ${i===0?`<div class="objs">${m.objs.map(o=>`<div>${esc(o)}</div>`).join('')}</div>`:''}
     <div class="prose">${l.html}</div>
     <div class="keypts"><b>Poin kunci</b><ul>${l.keys.map(k=>`<li>${esc(k)}</li>`).join('')}</ul></div>
     <div class="cp" id="cpBox"></div>`;
   } else if(v==='quiz'){
-    body=`<div class="lesson-h"><h2>Kuis Modul ${m.id}</h2><span class="pill ${M.qok?'ok':''}">Lulus ≥ 80% · terbaik ${M.q||0}%</span></div><p class="muted">5 soal. Opsi jawaban diacak setiap kali kamu mengulang.</p><div id="mq"></div>`;
+    body=`<div class="lesson-h"><h2>Kuis ${m.code}</h2><span class="pill ${M.qok?'ok':''}">Lulus ≥ 80% · terbaik ${M.q||0}%</span></div><p class="muted">${m.quiz.length} soal. Opsi jawaban diacak setiap kali kamu mengulang.</p><div id="mq"></div>`;
   } else if(v==='prak'){
     body=`<div class="lesson-h"><h2>Praktik di simulator</h2><span class="pill ${M.prac?'ok':''}">${M.prac?'Selesai':'Selesaikan minimal satu'}</span></div><p>Kerjakan skenario berikut. Mulai dengan <b>Mode panduan</b>, lalu ulangi di <b>Mode ujian</b> untuk memastikan kamu bisa tanpa bantuan.</p><div class="scen-list">${M.sims.map(simCard).join('')}</div>`;
   } else if(v==='note'){
     body=`<div class="lesson-h"><h2>Catatan saya</h2><span class="pill">Tersimpan di browser ini</span></div><p>${esc(m.note)}</p><textarea class="note" id="noteTa" placeholder="Tulis di sini…">${esc(S.notes[m.id]||'')}</textarea><p class="muted" style="font-size:13px" id="noteSt"></p>`;
   }
+  const wl=rolesFor(m.id,'w');
+  let banner='';
+  if(r&&!k){const wd=r.w.filter(id=>mastery(MOD[id]).done).length;banner=`<div class="outpath">${wd>=r.w.length?`Modul ini di luar jalur <b>${esc(r.t)}</b>. Modul wajibmu sudah selesai, jadi silakan eksplor.`:`Modul ini di luar jalur <b>${esc(r.t)}</b>. Boleh dipelajari, tapi kami sarankan selesaikan modul wajib dulu (${wd}/${r.w.length}).`} <a href="#jalur">Lihat jalurku</a></div>`;}
   $('#view').innerHTML=`<header class="pagehero">
-  <div class="eyebrow">Modul ${m.id} dari 8 · ${m.dur}</div>
-  <div class="spread" style="align-items:flex-end"><h1>${m.title}</h1>${M.done?'<span class="pill ok">Modul dikuasai</span>':''}</div>
+  <div class="eyebrow">${m.code} · ${catName(m.cat)} · ${m.dur}</div>
+  <div class="spread" style="align-items:flex-end"><h1>${esc(m.title)}</h1><span class="row" style="gap:6px">${k?relPill(k):''}${M.done?'<span class="pill ok">Modul dikuasai</span>':''}</span></div>
   <p class="lead">${m.sum}</p>
-  <div class="row" style="margin-top:12px">${mchips(M)}<span class="muted" style="font-size:13px">${M.done?'Semua syarat terpenuhi.':'Syarat dikuasai: semua pelajaran, kuis ≥ 80%'+(M.hasSim?', satu skenario simulator':'')+'.'}</span></div></header>
+  <div class="row" style="margin-top:12px">${mchips(M)}<span class="muted" style="font-size:13px">${M.done?'Semua syarat terpenuhi.':'Syarat dikuasai: semua pelajaran, kuis ≥ 80%'+(M.hasSim?', satu skenario simulator':'')+'.'}</span></div>
+  ${wl.length?`<p style="margin:10px 0 0;font-size:13px">Wajib untuk: ${wl.map(x=>`<a href="#role-${x.id}" style="color:#fff">${esc(x.t)}</a>`).join(', ')}</p>`:''}</header>
+  ${banner}
   <div class="mod-layout"><nav class="ltoc" aria-label="Daftar pelajaran"><div class="lt-h">Pelajaran</div>${toc}</nav><div class="lesson">${body}
-  <div class="foot-nav">${prev?`<a class="btn ghost" href="#modul-${prev.id}">← M${prev.id}</a>`:'<span></span>'}${next?`<a class="btn ghost" href="#modul-${next.id}">M${next.id}: ${next.title} →</a>`:`<a class="btn ghost" href="#kuis">Ujian akhir →</a>`}</div></div></div>`;
+  <div class="foot-nav">${prev?`<a class="btn ghost" href="#modul-${prev.id}">← ${prev.code}</a>`:'<span></span>'}${next?`<a class="btn ghost" href="#modul-${next.id}">${next.code}: ${esc(shortT(next))} →</a>`:`<a class="btn ghost" href="#kuis">Ujian ${r?'jalur':'campuran'} →</a>`}</div></div></div>`;
   $$('[data-lv]').forEach(b=>b.onclick=()=>{MODV.view=b.dataset.lv;drawModule(m);window.scrollTo({top:0});});
   initWidgets($('#view'));
   bindSimCards();
   if(v.startsWith('l')) drawCheckpoint(m,+v.slice(1));
-  if(v==='quiz') runMC($('#mq'),m.quiz.map(q=>shufQ(q)),sc=>{S.mq[m.id]=Math.max(S.mq[m.id]||0,sc);save();renderNav('modul-'+m.id);const r=$('#mcRes');if(r&&sc>=80){r.insertAdjacentHTML('beforeend',`<div style="margin-top:8px">${M.hasSim&&!M.prac?'<button class="btn sm" id="goPrak">Lanjut ke praktik simulator →</button>':next?`<a class="btn sm" href="#modul-${next.id}">Lanjut ke Modul ${next.id} →</a>`:''}</div>`);$('#goPrak')&&($('#goPrak').onclick=()=>{MODV.view='prak';drawModule(m);});}});
+  if(v==='quiz') runMC($('#mq'),m.quiz.map(q=>shufQ(q)),sc=>{S.mq[m.id]=Math.max(S.mq[m.id]||0,sc);save();renderNav('modul-'+m.id);const rs=$('#mcRes');if(rs&&sc>=80){rs.insertAdjacentHTML('beforeend',`<div style="margin-top:8px">${M.hasSim&&!M.prac?'<button class="btn sm" id="goPrak">Lanjut ke praktik simulator →</button>':next?`<a class="btn sm" href="#modul-${next.id}">Lanjut ke ${next.code} →</a>`:''}</div>`);$('#goPrak')&&($('#goPrak').onclick=()=>{MODV.view='prak';drawModule(m);});}});
   if(v==='note'){const ta=$('#noteTa');let t;ta.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.notes[m.id]=ta.value;save();$('#noteSt').textContent='Tersimpan.';},400);};}
 }
 function shufQ(q){const idx=shuffle(q.o.map((_,i)=>i));return {q:q.q,o:idx.map(i=>q.o[i]),a:idx.indexOf(q.a),e:q.e};}
@@ -2404,24 +3465,28 @@ scurve(w){
 };
 
 /* ===================== QUIZ VIEW ===================== */
+function examPool(){const r=roleOf();const ids=r?roleCore(r):ORDER;return ids.flatMap(id=>MOD[id].quiz.map(q=>Object.assign({},q,{mod:id})));}
 function renderQuizHome(){
-  const cats=['Semua','Movement','T-code','Pembelian','Opname','Aset','Proyek','Navigasi','Urutan'];
-  $('#view').innerHTML=`<div class="eyebrow">Uji pemahaman</div><h1>Kuis & Ujian akhir</h1><p class="lead">Pilih topik untuk latihan, atau pilih <b>Semua</b> untuk ujian akhir: 12 soal acak plus 2 soal urutan, lulus ≥ 80%. Skor ujian terbaik: <b>${S.quiz.best||0}%</b>${(S.quiz.best||0)>=80?' <span class="pill ok">Lulus</span>':''}.</p>
-  <div class="card" style="margin-top:14px"><b style="font-family:var(--font-d);font-size:17px">Pilih topik</b><div class="chips" id="qcats">${cats.map((c,i)=>{const n=c==='Semua'?14:c==='Urutan'?OBANK.length:QBANK.filter(q=>q.c===c).length;return `<button class="chip ${i===0?'on':''}" data-c="${c}">${c==='Semua'?'Ujian akhir':c==='Urutan'?'Urutan transaksi':c} <span style="opacity:.7">(${n})</span></button>`;}).join('')}</div>
-  <div class="row"><button class="btn" id="qStart">Mulai</button><span style="font-size:13px;color:var(--muted)">Hanya skor ujian akhir yang dicatat di progres.</span></div></div><div id="qArea"></div>`;
-  let cat='Semua';
+  const r=roleOf(); const best=r?((S.quiz.r||{})[r.id]||0):(S.quiz.best||0);
+  const cats=[['Ujian',r?'Ujian jalur':'Ujian campuran',15],...['Movement','T-code','Pembelian','Opname','Aset','Proyek','Navigasi'].map(c=>[c,'MM & proyek: '+c,QBANK.filter(q=>q.c===c).length]),['Urutan','Urutan transaksi MM',OBANK.length]];
+  $('#view').innerHTML=`<div class="eyebrow">Uji pemahaman</div><h1>Kuis & Ujian</h1><p class="lead">${r?`<b>Ujian jalur ${esc(r.t)}</b>: 15 soal acak dari modul wajib dan general jalurmu`:'<b>Ujian campuran</b>: 15 soal acak dari semua modul'}, lulus ≥ 80%. Skor terbaik: <b>${best}%</b>${best>=80?' <span class="pill ok">Lulus</span>':''}. Kuis per modul ada di halaman masing-masing modul.</p>
+  <div class="card" style="margin-top:14px"><b style="font-size:17px">Pilih ujian atau latihan</b><div class="chips" id="qcats">${cats.map((c,i)=>`<button class="chip ${i===0?'on':''}" data-c="${c[0]}">${c[1]} <span style="opacity:.7">(${c[2]})</span></button>`).join('')}</div>
+  <div class="row"><button class="btn" id="qStart">Mulai</button><span style="font-size:13px;color:var(--muted)">Hanya skor ujian ${r?'jalur':'campuran'} yang dicatat di progres.</span></div></div><div id="qArea"></div>`;
+  let cat='Ujian';
   $$('#qcats .chip').forEach(b=>b.onclick=()=>{cat=b.dataset.c;$$('#qcats .chip').forEach(x=>x.classList.toggle('on',x===b));});
   $('#qStart').onclick=()=>startQuiz(cat);
 }
 function startQuiz(cat){
-  let mc=[],ord=[];
-  if(cat==='Semua'){mc=shuffle(QBANK).slice(0,12).map(shufQ);ord=shuffle(OBANK).slice(0,2);}
+  let mc=[],ord=[];const r=roleOf();
+  if(cat==='Ujian'){mc=shuffle(examPool()).slice(0,15).map(q=>Object.assign(shufQ(q),{mod:q.mod}));}
   else if(cat==='Urutan')ord=OBANK.slice(); else mc=QBANK.filter(q=>q.c===cat).map(shufQ);
   const total=mc.length+ord.length;let done=0,correct=0;const area=$('#qArea');
   area.innerHTML=`<div id="qMC"></div><div id="qORD"></div><div class="result" id="qFinal" hidden></div>`;
-  const finish=()=>{if(done<total)return;const sc=Math.round(correct/total*100);if(cat==='Semua'){S.quiz.best=Math.max(S.quiz.best||0,sc);save();renderNav('kuis');}const f=$('#qFinal');f.hidden=false;f.innerHTML=`<b style="font-family:var(--font-d);font-size:20px">Skor: ${correct}/${total} (${sc}%)</b> ${sc>=80?'<span class="pill ok">Lulus</span>':'<span class="pill bad">Belum lulus</span>'}<p>${sc>=80?'Bagus! Kamu siap memakai SAP untuk tugas harian.':'Ulangi modul yang soalnya banyak salah, lalu coba lagi.'}</p><button class="btn sm" id="qRe">Ulangi</button>`;$('#qRe').onclick=()=>startQuiz(cat);f.scrollIntoView({behavior:'smooth',block:'center'});};
+  const finish=()=>{if(done<total)return;const sc=Math.round(correct/total*100);if(cat==='Ujian'){if(r){S.quiz.r=S.quiz.r||{};S.quiz.r[r.id]=Math.max(S.quiz.r[r.id]||0,sc);}else S.quiz.best=Math.max(S.quiz.best||0,sc);save();renderNav('kuis');}const f=$('#qFinal');f.hidden=false;
+    const miss=cat==='Ujian'?[...new Set(mc.filter((q,i)=>$(`#qMC .q[data-i="${i}"] .opt.wrong`)).map(q=>q.mod))]:[];
+    f.innerHTML=`<b style="font-size:20px">Skor: ${correct}/${total} (${sc}%)</b> ${sc>=80?'<span class="pill ok">Lulus</span>':'<span class="pill bad">Belum lulus</span>'}<p>${sc>=80?'Bagus! Pemahamanmu sudah kuat.':'Ulangi modul yang soalnya banyak salah, lalu coba lagi.'}</p>${miss.length?`<p style="font-size:14px">Ulas modul: ${miss.map(id=>`<a href="#modul-${id}">${MOD[id].code}</a>`).join(', ')}</p>`:''}<button class="btn sm" id="qRe">Ulangi</button>`;$('#qRe').onclick=()=>startQuiz(cat);f.scrollIntoView({behavior:'smooth',block:'center'});};
   const mcEl=$('#qMC');
-  mcEl.innerHTML=mc.map((q,i)=>`<div class="q" data-i="${i}"><div class="spread"><div class="q-h">${i+1}. ${esc(q.q)}</div></div>${q.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o)}</button>`).join('')}<div class="exp" hidden></div></div>`).join('');
+  mcEl.innerHTML=mc.map((q,i)=>`<div class="q" data-i="${i}"><div class="spread"><div class="q-h">${i+1}. ${esc(q.q)}</div>${q.mod?`<span class="pill">${MOD[q.mod].code}</span>`:''}</div>${q.o.map((o,j)=>`<button class="opt" data-j="${j}">${esc(o)}</button>`).join('')}<div class="exp" hidden></div></div>`).join('');
   $$('.q',mcEl).forEach(box=>{const q=mc[+box.dataset.i];$$('.opt',box).forEach(b=>b.onclick=()=>{const ok=+b.dataset.j===q.a;$$('.opt',box).forEach(x=>{x.disabled=true;if(+x.dataset.j===q.a)x.classList.add('right');});if(!ok)b.classList.add('wrong');const ex=$('.exp',box);ex.hidden=false;ex.innerHTML=`<b style="color:${ok?'var(--ok)':'var(--bad)'}">${ok?'Benar.':'Belum tepat.'}</b> ${esc(q.e)}`;done++;if(ok)correct++;finish();});});
   const oEl=$('#qORD');
   ord.forEach((o,oi)=>{const box=document.createElement('div');box.className='q';oEl.appendChild(box);let cur=shuffle(o.items);if(cur.join()===o.items.join())cur=cur.reverse();let locked=false;
@@ -2434,24 +3499,27 @@ function startQuiz(cat){
 }
 
 /* ===================== FLASHCARDS ===================== */
+const CARD_MOD={Beli:'mm-pur',Stok:'mm-im','Data induk':'org',Opname:'mm-pi',Aset:'fi-aa',Proyek:'ps',PM:'pm'};
+const ALLCARDS=(()=>{const out=CARDS.map(c=>[c[0],c[1],CARD_MOD[c[2]]||'mm-im',c[3]]);const seen=new Set(out.map(c=>c[0]));
+  MODULES.forEach(m=>m.lessons.forEach(l=>(l.tcRows||[]).forEach(([codes,desc])=>codes.split(' / ').forEach(c=>{c=c.trim();if(/\s/.test(c)||!/^[A-Z0-9_\/\-\.(]+$/.test(c)||seen.has(c))return;seen.add(c);out.push([c,KNOWN[c]||(m.code+' · '+shortT(m)),m.id,desc.replace(/<[^>]+>/g,'')]);}))));return out;})();
 function renderCards(){
-  const cats=['Semua',...new Set(CARDS.map(c=>c[2]))];let cat='Semua',q='',hideKnown=false,mode='cards';
-  const shell=()=>{$('#view').innerHTML=`<div class="eyebrow">Hafalan</div><h1>Flashcard T-code</h1><p class="lead">Mode <b>Kartu</b> untuk membaca dan membalik. Mode <b>Latihan ketik</b> menguji ingatanmu: baca fungsinya, ketik T-code-nya.</p>
-    <div class="chips"><button class="chip ${mode==='cards'?'on':''}" data-m="cards">Kartu</button><button class="chip ${mode==='drill'?'on':''}" data-m="drill">Latihan ketik</button></div><div id="fcArea"></div>`;
-    $$('[data-m]').forEach(b=>b.onclick=()=>{mode=b.dataset.m;shell();});mode==='cards'?cardsView():drillView();};
+  const r=roleOf();let cat=r?'jalur':'all',q='',hideKnown=false,mode='cards';
+  const inCat=c=>cat==='all'||(cat==='jalur'?!!relOf(c[2],r):c[2]===cat);
+  const shell=()=>{$('#view').innerHTML=`<div class="eyebrow">Hafalan</div><h1>Flashcard T-code</h1><p class="lead">${ALLCARDS.length} kartu dari semua modul. Mode <b>Kartu</b> untuk membaca dan membalik. Mode <b>Latihan ketik</b> menguji ingatanmu: baca fungsinya, ketik T-code-nya.</p>
+    <div class="chips"><button class="chip ${mode==='cards'?'on':''}" data-m="cards">Kartu</button><button class="chip ${mode==='drill'?'on':''}" data-m="drill">Latihan ketik</button></div>
+    <div class="filt"><label for="fcCat" class="muted" style="font-size:13px">Kartu dari</label><select id="fcCat">${r?`<option value="jalur" ${cat==='jalur'?'selected':''}>Jalur ${esc(r.t)}</option>`:''}<option value="all" ${cat==='all'?'selected':''}>Semua modul</option>${MODULES.filter(m=>ALLCARDS.some(c=>c[2]===m.id)).map(m=>`<option value="${m.id}" ${cat===m.id?'selected':''}>${m.code} · ${esc(shortT(m))}</option>`).join('')}</select></div><div id="fcArea"></div>`;
+    $$('[data-m]').forEach(b=>b.onclick=()=>{mode=b.dataset.m;shell();});$('#fcCat').onchange=e=>{cat=e.target.value;shell();};mode==='cards'?cardsView():drillView();};
   const cardsView=()=>{
-    $('#fcArea').innerHTML=`<div class="spread"><div class="chips" id="fcCats">${cats.map(c=>`<button class="chip ${c===cat?'on':''}" data-c="${c}">${c}</button>`).join('')}</div>
-    <div class="row"><input id="fcQ" value="${esc(q)}" placeholder="Cari T-code / fungsi" style="font:14px var(--font-b);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)" aria-label="Cari flashcard"><label style="font-size:13px"><input type="checkbox" id="fcHide" ${hideKnown?'checked':''}> Sembunyikan yang sudah hafal</label></div></div>
+    $('#fcArea').innerHTML=`<div class="filt"><input id="fcQ" value="${esc(q)}" placeholder="Cari T-code / fungsi" aria-label="Cari flashcard"><label style="font-size:13px"><input type="checkbox" id="fcHide" ${hideKnown?'checked':''}> Sembunyikan yang sudah hafal</label></div>
     <p id="fcCount" style="font-size:13px;color:var(--muted)"></p><div class="fc-grid" id="fcGrid"></div>`;
-    const draw=()=>{const list=CARDS.filter(c=>(cat==='Semua'||c[2]===cat)&&(!q||(c[0]+c[1]+c[3]).toLowerCase().includes(q))&&(!hideKnown||!S.cards[c[0]]));
-      $('#fcCount').textContent=`${Object.values(S.cards).filter(Boolean).length}/${CARDS.length} kartu sudah hafal · ${list.length} ditampilkan`;
-      $('#fcGrid').innerHTML=list.map(c=>`<div><button class="fc ${S.cards[c[0]]?'known':''}" data-c="${c[0]}" aria-label="Kartu ${c[0]}"><div class="fc-in"><div class="fc-f"><span class="code">${c[0]}</span><small>${c[2]} · klik untuk membalik</small></div><div class="fc-b"><b>${c[1]}</b><span>${c[3]}</span></div></div></button><div class="fc-tools"><span style="color:var(--muted)">${c[2]}</span><button class="linkbtn" data-k="${c[0]}">${S.cards[c[0]]?'✓ Hafal':'Tandai hafal'}</button></div></div>`).join('')||'<p>Tidak ada kartu yang cocok.</p>';
+    const draw=()=>{const list=ALLCARDS.filter(c=>inCat(c)&&(!q||(c[0]+c[1]+c[3]).toLowerCase().includes(q))&&(!hideKnown||!S.cards[c[0]]));const pool=ALLCARDS.filter(inCat);
+      $('#fcCount').textContent=`${pool.filter(c=>S.cards[c[0]]).length}/${pool.length} kartu sudah hafal · ${list.length} ditampilkan`;
+      $('#fcGrid').innerHTML=list.map(c=>`<div><button class="fc ${S.cards[c[0]]?'known':''}" data-c="${c[0]}" aria-label="Kartu ${c[0]}"><div class="fc-in"><div class="fc-f"><span class="code">${c[0]}</span><small>${MOD[c[2]].code} · klik untuk membalik</small></div><div class="fc-b"><b>${esc(c[1])}</b><span>${esc(c[3])}</span></div></div></button><div class="fc-tools"><span style="color:var(--muted)">${MOD[c[2]].code}</span><button class="linkbtn" data-k="${c[0]}">${S.cards[c[0]]?'✓ Hafal':'Tandai hafal'}</button></div></div>`).join('')||'<p>Tidak ada kartu yang cocok.</p>';
       $$('.fc').forEach(b=>b.onclick=()=>b.classList.toggle('flip'));
       $$('[data-k]',$('#fcGrid')).forEach(b=>b.onclick=()=>{S.cards[b.dataset.k]=!S.cards[b.dataset.k];save();draw();renderNav('flashcard');});};
-    $$('#fcCats .chip').forEach(b=>b.onclick=()=>{cat=b.dataset.c;$$('#fcCats .chip').forEach(x=>x.classList.toggle('on',x===b));draw();});
     $('#fcQ').oninput=e=>{q=e.target.value.toLowerCase();draw();};$('#fcHide').onchange=e=>{hideKnown=e.target.checked;draw();};draw();};
   const drillView=()=>{
-    const deck=shuffle(CARDS).slice(0,10);let i=0,score=0,answered=false;
+    const deck=shuffle(ALLCARDS.filter(inCat)).slice(0,10);let i=0,score=0,answered=false;
     const draw=(fb)=>{const c=deck[i];
       $('#fcArea').innerHTML=i<deck.length?`<div class="card drill"><div class="spread"><span class="pill">${i+1}/${deck.length}</span><span class="muted" style="font-size:13px">Skor ${score}</span></div><h3>${esc(c[1])}</h3><p>${esc(c[3])}</p><label for="drIn" class="muted" style="font-size:13px">Ketik T-code-nya lalu Enter</label><input id="drIn" autocomplete="off" spellcheck="false" ${answered?'disabled':''}>${fb||''}<div class="row" style="margin-top:10px">${answered?'<button class="btn sm" id="drNext">Berikutnya →</button>':'<button class="btn sm" id="drChk">Periksa</button><button class="btn sm ghost" id="drSkip">Lewati</button>'}</div></div>`
       :`<div class="card drill"><h3>Selesai</h3><p>Skor <b>${score}/${deck.length}</b>. ${score>=8?'Hafalanmu kuat.':'Ulangi beberapa kali sampai ≥ 8.'}</p><button class="btn sm" id="drAgain">Latihan lagi</button></div>`;
@@ -2468,11 +3536,11 @@ function renderCards(){
 /* ===================== CASE STUDIES ===================== */
 function renderCaseHome(){
   const K=SIMS.filter(x=>x.kase);
-  $('#view').innerHTML=`<div class="eyebrow">Praktik</div><h1>Studi Kasus</h1><p class="lead">Situasi nyata yang sering dihadapi admin proyek. Ada dua jenis: <b>studi kasus terpadu</b> yang mencampur keputusan dengan praktik langsung di SAP, dan <b>studi kasus keputusan</b> untuk melatih cara berpikir.</p>
+  $('#view').innerHTML=`<div class="eyebrow">Praktik</div><h1>Studi Kasus</h1><p class="lead">Situasi nyata dari pekerjaan sehari-hari. Saat ini studi kasus berfokus pada MM, PS, dan aset; kasus modul lain ada dalam bentuk skenario simulator dan kuis. Ada dua jenis: <b>studi kasus terpadu</b> yang mencampur keputusan dengan praktik langsung di SAP, dan <b>studi kasus keputusan</b> untuk melatih cara berpikir.</p>
   <h2>Studi kasus terpadu: keputusan + praktik SAP</h2><p class="muted" style="max-width:72ch">Setiap kasus berganti antara pertanyaan keputusan (dengan umpan balik untuk setiap pilihan) dan transaksi di simulator SAP GUI. Kamu perlu login sekali (client 800).</p>
   <div class="scen-list">${K.map(simCard).join('')}</div>
   <h2>Studi kasus keputusan</h2>
-  <div class="scen-list">${CASES.map(c=>`<button class="scen" data-case="${c.id}"><span class="row"><span class="pill">${c.tag}</span>${S.cases[c.id]!=null?`<span class="pill ok">Skor ${S.cases[c.id]}/${c.steps.length}</span>`:''}</span><b>${c.title}</b><small>${c.steps.length} keputusan</small></button>`).join('')}</div>`;
+  <div class="scen-list">${CASES.map(c=>`<button class="scen" data-case="${c.id}"><span class="row"><span class="pill">${MOD[c.mod].code}</span>${relPill(relOf(c.mod))}<span class="pill">${c.tag}</span>${S.cases[c.id]!=null?`<span class="pill ok">Skor ${S.cases[c.id]}/${c.steps.length}</span>`:''}</span><b>${c.title}</b><small>${c.steps.length} keputusan</small></button>`).join('')}</div>`;
   $$('[data-case]').forEach(b=>b.onclick=()=>playCase(b.dataset.case));
   bindSimCards();
 }
@@ -2496,12 +3564,15 @@ function playCase(id){
 function renderRef(){
   const byCat={};CARDS.forEach(c=>{(byCat[c[2]]=byCat[c[2]]||[]).push(c);});
   const want=[['membuat PR','ME51N'],['cek status PR / apakah sudah jadi PO','ME5A, ME53N'],['melihat PO dan apakah sudah GR/invoice','ME23N','(tab PO history)'],['daftar PO yang belum datang','ME2N, ME2L','+ WE101'],['menerima barang','MIGO','A01 + R01, mvt 101'],['menerima jasa','ML81N'],['mengeluarkan barang ke proyek','MIGO','A07 + R10, mvt 221 + WBS'],['membatalkan dokumen barang','MIGO','A03 + R02'],['cek stok satu gudang','MB52'],['cek stok satu material di semua lokasi','MMBE'],['riwayat pergerakan barang','MB51'],['opname','MI01, MI21, MI04, MI11, MI20, MI07','(berurutan)'],['biaya aktual proyek','CJI3'],['komitmen proyek','CJI5'],['biaya cost center','KSB1'],['data & nilai aset','AS03, AW01N, AR01'],['work order maintenance','IW33, IW38']];
-  $('#view').innerHTML=`<div class="eyebrow">Referensi cepat</div><h1>Cheat sheet SAP Admin Proyek</h1><p class="lead">Satu halaman untuk dibuka saat bekerja. Semua T-code standar; cocokkan dengan akses di perusahaanmu.</p>
+  $('#view').innerHTML=`<div class="eyebrow">Referensi cepat</div><h1>Cheat sheet SAP</h1><p class="lead">Satu halaman untuk dibuka saat bekerja. Semua T-code standar; cocokkan dengan akses di perusahaanmu.</p><div class="filt"><label for="refMod" class="muted" style="font-size:13px">T-code & app untuk</label><select id="refMod">${roleOf()?`<option value="jalur">Jalur ${esc(roleOf().t)}</option>`:''}<option value="all">Semua modul</option>${MODULES.map(m=>`<option value="${m.id}">${m.code} · ${esc(shortT(m))}</option>`).join('')}</select></div><div id="refTc"></div><h2 style="margin-top:36px">Detail MM & proyek</h2>
   <h2>Movement type</h2><div class="tbl-wrap"><table><tr><th>Mvt</th><th>Arti</th><th>Objek wajib</th><th>Batal</th></tr><tr><td><b>101</b></td><td>GR terhadap PO</td><td>PO</td><td>102</td></tr><tr><td><b>201</b></td><td>GI ke cost center</td><td>Cost center</td><td>202</td></tr><tr><td><b>221</b></td><td>GI ke proyek/WBS</td><td>WBS</td><td>222</td></tr><tr><td><b>261</b></td><td>GI ke order</td><td>Order</td><td>262</td></tr><tr><td><b>311</b></td><td>Transfer antar sloc</td><td>Sloc tujuan</td><td>312</td></tr></table></div>
   <h2>"Saya ingin…" → T-code</h2><div class="tbl-wrap"><table><tr><th>Saya ingin…</th><th>T-code</th><th>Catatan</th></tr>${want.map(r=>`<tr><td>${r[0]}</td><td>${r[1].split(', ').map(tc).join(' ')}</td><td>${r[2]||''}</td></tr>`).join('')}</table></div>
   <h2>Navigasi & ALV</h2><div class="tbl-wrap"><table><tr><th>Perintah</th><th>Fungsi</th></tr><tr><td><code>/nXXXX</code></td><td>Pindah transaksi di jendela yang sama</td></tr><tr><td><code>/oXXXX</code></td><td>Buka di jendela baru</td></tr><tr><td><code>Enter · F4 · F8 · F3 · Ctrl+S</code></td><td>Validasi · Pilihan · Execute · Back · Save</td></tr><tr><td>Multiple selection</td><td>Tempel daftar nomor dari Excel (Shift+F12)</td></tr><tr><td>Variant</td><td>Ctrl+S di layar filter; Get Variant: Shift+F5</td></tr><tr><td>ALV</td><td>Klik judul kolom → Sort / Filter / Σ / Export</td></tr></table></div>
-  <h2>Semua T-code per kategori</h2><div class="grid g2">${Object.entries(byCat).map(([k,v])=>`<div class="card"><b style="font-family:var(--font-d);font-size:17px">${k}</b>${v.map(c=>`<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px"><span style="min-width:62px">${tc(c[0])}</span><span>${c[3]}</span></div>`).join('')}</div>`).join('')}</div>
+  <h2>T-code MM & proyek per kategori</h2><div class="grid g2">${Object.entries(byCat).map(([k,v])=>`<div class="card"><b style="font-family:var(--font-d);font-size:17px">${k}</b>${v.map(c=>`<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px"><span style="min-width:62px">${tc(c[0])}</span><span>${c[3]}</span></div>`).join('')}</div>`).join('')}</div>
   <h2>Glosarium</h2><div class="tbl-wrap"><table>${[['PR','Purchase Requisition, permintaan pembelian internal'],['PO','Purchase Order, pesanan resmi ke vendor'],['GR','Goods Receipt, penerimaan barang'],['GI','Goods Issue, pengeluaran barang'],['SES','Service Entry Sheet, penerimaan jasa'],['3-way match','Pencocokan PO, GR, dan invoice sebelum bayar'],['WBS','Work Breakdown Structure, struktur paket pekerjaan proyek'],['AuC','Asset under Construction, aset dalam pengerjaan'],['APC','Acquisition and Production Cost, nilai perolehan aset'],['ALV','Tampilan tabel laporan SAP dengan sort, filter, total, export'],['Komitmen','Nilai PO yang mengikat budget tapi belum terealisasi'],['SPI','Schedule Performance Index = aktual ÷ rencana'],['RAG','Red-Amber-Green, status ringkas proyek'],['Sloc','Storage location, lokasi gudang di dalam plant'],['BAST','Berita Acara Serah Terima']].map(r=>`<tr><td style="width:150px"><b>${r[0]}</b></td><td>${r[1]}</td></tr>`).join('')}</table></div>`;
+  const drawRef=()=>{const v=$('#refMod').value;const r=roleOf();const ids=v==='all'?ORDER:v==='jalur'?rolePath(r):[v];
+    $('#refTc').innerHTML=ids.map(id=>{const m=MOD[id];const rows=m.lessons.flatMap(l=>l.tcRows||[]);if(!rows.length)return '';return `<h3 style="margin:22px 0 6px;font-size:17px;font-weight:500">${m.code} · ${esc(shortT(m))} ${relPill(relOf(id))}</h3><div class="tbl-wrap"><table><tr><th style="width:34%">T-code / app</th><th>Fungsi</th></tr>${rows.map(r=>`<tr><td>${r[0].split(' / ').map(tcCell).join(' ')}</td><td>${r[1]}</td></tr>`).join('')}</table></div>`;}).join('')||'<p class="muted">Modul ini memakai referensi detail di bawah.</p>';};
+  $('#refMod').onchange=drawRef;drawRef();
 }
 
 /* ===================== INIT ===================== */
