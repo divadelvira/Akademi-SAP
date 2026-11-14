@@ -26,7 +26,7 @@ Deploy from `main` only.
 
 ### Roles & access
 
-- Learners pick a role when signing up. Users without a role (older accounts) pick one once, on their next login.
+- Sign-up asks only for username, password and invite code. After the first login the learner picks a role once, from a role's detail page ("Pilih role ini", then confirm). Until then they can browse roles, the module catalog and module previews (summary + chapter list), glosarium and referensi; home, simulator, ujian, flashcard, studi kasus, jalur and report show "Pilih role dulu".
 - The role's modules are open: wajib, general and pendukung. Every other module shows as locked (🔒), with a "Minta akses" button. The home page also suggests add-on modules from similar roles.
 - Learners can request three things: one extra module, a second role, or a role change. An admin approves or rejects each request at `/admin` ("Permintaan akses"). The admin can also edit any user's role, extra roles and extra modules directly ("Pengguna"). Admins can open every module.
 - Locking covers each module's lessons and quiz. The simulator, studi kasus and flashcards stay open for everyone.

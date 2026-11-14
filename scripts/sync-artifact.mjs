@@ -42,7 +42,7 @@ for (const [, id, code, cat, title] of js.matchAll(/\{id:'([\w-]+)',code:'([^']+
 for (const [id, code, cat, title] of Object.values(LEG_MAP)) found[id] = { id, code, cat, title };
 const MODS = ORDER.map((id) => { assert(found[id], `catalog: module ${id} not found`); return found[id]; });
 for (const r of ROLES) for (const id of [...r.w, ...r.g, ...r.p]) assert(found[id], `catalog: role ${r.id} uses unknown module ${id}`);
-for (const hook of ['function renderModule(', 'function renderHome(', 'function renderRoles(', 'function renderRoleDetail(', 'function roleCard(', 'function modCard(', 'function route(', 'let S=', 'function save(', 'const MOD=']) {
+for (const hook of ['function renderModule(', 'function renderHome(', 'function renderRoles(', 'function renderRoleDetail(', 'function roleCard(', 'function modCard(', 'function route(', 'function renderSimHome(', 'function renderQuizHome(', 'function renderCards(', 'function renderCaseHome(', 'function renderReport(', 'function renderPath(', 'let S=', 'function save(', 'const MOD=']) {
   assert(js.includes(hook), `bridge hook "${hook}" missing, update public/access.js`);
 }
 const cats = CATS.map(({ id, t }) => ({ id, t }));
