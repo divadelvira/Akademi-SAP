@@ -3333,9 +3333,9 @@ function refreshGuide(){
 }
 function attachH(a){
   if(!a) return '';
-  if(a.t==='xl') return `<div class="att"><div class="att-h"><span>📎 ${esc(a.title)}</span><button class="linkbtn" id="copyCol">Salin kolom</button></div><table class="xl"><tr><th>A · ${esc(a.col||'No. PO')}</th></tr>${a.rows.map(r=>`<tr><td>${r}</td></tr>`).join('')}</table></div>`;
-  if(a.t==='sj') return `<div class="att"><div class="att-h"><span>📎 ${esc(a.title)}</span></div><table>${a.rows.map(r=>`<tr><td class="muted">${esc(r[0])}</td><td><b>${esc(r[1])}</b></td></tr>`).join('')}</table></div>`;
-  if(a.t==='sheet') return `<div class="att"><div class="att-h"><span>📎 ${esc(a.title)}</span></div><table><tr>${(a.h||['Item','Material','Hitung']).map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${a.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`;
+  if(a.t==='xl') return `<div class="att"><div class="att-h"><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>${esc(a.title)}</span><button class="linkbtn" id="copyCol">Salin kolom</button></div><table class="xl"><tr><th>A · ${esc(a.col||'No. PO')}</th></tr>${a.rows.map(r=>`<tr><td>${r}</td></tr>`).join('')}</table></div>`;
+  if(a.t==='sj') return `<div class="att"><div class="att-h"><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>${esc(a.title)}</span></div><table>${a.rows.map(r=>`<tr><td class="muted">${esc(r[0])}</td><td><b>${esc(r[1])}</b></td></tr>`).join('')}</table></div>`;
+  if(a.t==='sheet') return `<div class="att"><div class="att-h"><span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>${esc(a.title)}</span></div><table><tr>${(a.h||['Item','Material','Hitung']).map(h=>`<th>${esc(h)}</th>`).join('')}</tr>${a.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>`;
   return '';
 }
 function stepDone(){const st=stepOf();if(!st)return false;if(st.k==='nav'||st.k==='logon')return SIM.navDone;if(st.k==='tx')return SIM.txDone&&live();if(st.k==='q')return SIM.qDone!=null;if(st.k==='act')return !!st.goal(SIM);return false;}
@@ -3790,7 +3790,7 @@ function drawModule(m){
   <div class="spread" style="align-items:flex-end"><h1>${esc(m.title)}</h1><span class="row" style="gap:6px">${k?relPill(k):''}${M.done?'<span class="pill ok">Modul dikuasai</span>':''}</span></div>
   <p class="lead">${m.sum}</p>
   <div class="row" style="margin-top:12px">${mchips(M)}<span class="muted" style="font-size:13px">${M.done?'Modul dikuasai.':'Syarat dikuasai: semua bab lulus cek pemahaman dan ujian akhir ≥ 80%.'}</span></div>
-  ${wl.length?`<p style="margin:10px 0 0;font-size:13px">Kompetensi inti untuk: ${wl.map(x=>`<a href="#role-${x.id}" style="color:#fff">${esc(x.t)}</a>`).join(', ')}</p>`:''}</header>
+  ${wl.length?`<p style="margin:10px 0 0;font-size:13px">Kompetensi inti untuk: ${wl.map(x=>`<a href="#role-${x.id}" >${esc(x.t)}</a>`).join(', ')}</p>`:''}</header>
   ${banner}
   <div class="mod-layout"><nav class="ltoc" aria-label="Daftar bab"><div class="lt-h">Bab</div>${toc}</nav><div class="lesson">${body}
   <div class="foot-nav">${prev?`<a class="btn ghost" href="#modul-${prev.id}">← ${prev.code}</a>`:'<span></span>'}${next?`<a class="btn ghost" href="#modul-${next.id}">${next.code}: ${esc(shortT(next))} →</a>`:`<a class="btn ghost" href="#${r?'jalur':'kuis'}">${r?'Jalur saya':'Ujian'} →</a>`}</div></div></div>`;
@@ -3798,6 +3798,7 @@ function drawModule(m){
   $('#addOn')&&($('#addOn').onclick=()=>{S.addons=isAdd?S.addons.filter(x=>x!==m.id):[...S.addons,m.id];save();drawModule(m);renderNav('modul-'+m.id);});
   initWidgets($('#view'));
   bindAll($('#view'));
+  if(matchMedia('(max-width:900px)').matches){const on=$('.ltoc .on');on&&on.scrollIntoView({block:'nearest',inline:'center'});}
   if(v[0]==='l') drawCheckpoint(m,+v.slice(1));
   if(v==='exam'){$('#mxGo').onclick=()=>{const qs=shuffle(modExamPool(m)).map(q=>shufQ(q));runMC($('#mq'),qs,s=>{S.mq[m.id]=Math.max(S.mq[m.id]||0,s);logAtt('mx:'+m.id,s);renderNav('modul-'+m.id);const rs=$('#mcRes');if(rs&&s>=80&&next)rs.insertAdjacentHTML('beforeend',`<div style="margin-top:8px"><a class="btn sm" href="#modul-${next.id}">Lanjut ke ${next.code} →</a></div>`);},true);};}
   if(v==='note'){const ta=$('#noteTa');let t;ta.oninput=()=>{clearTimeout(t);t=setTimeout(()=>{S.notes[m.id]=ta.value;save();$('#noteSt').textContent='Tersimpan.';},400);};}
@@ -4100,4 +4101,7 @@ function renderRef(){
 
 /* ===================== INIT ===================== */
 $('#menuBtn').onclick=()=>{const s=$('#side');s.classList.toggle('open');$('#menuBtn').setAttribute('aria-expanded',s.classList.contains('open'));};
+const closeMenu=()=>{$('#side').classList.remove('open');$('#menuBtn').setAttribute('aria-expanded','false');};
+$('#nav').addEventListener('click',e=>{if(e.target.closest('a'))closeMenu();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#side').classList.contains('open')){closeMenu();$('#menuBtn').focus();}});
 route();
