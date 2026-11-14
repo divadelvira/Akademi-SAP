@@ -10,23 +10,30 @@ import '../styles/app.css';
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@350;400;500;700&display=swap" rel="stylesheet">
-<style is:inline>[hidden]{display:none!important}</style>
+<style is:inline>[hidden]{display:none!important}
+  .auth{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:16px}
+  .auth form{width:100%;max-width:380px}
+  .auth h1{font-size:22px;margin:0 0 4px}
+  .auth .inputs{grid-template-columns:1fr}
+  .auth .err{color:var(--bad);font-size:14px;min-height:1.4em;margin:10px 0}
+  .auth .btn{width:100%}
+</style>
 </head>
 <body>
-<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px">
-  <form id="f" class="card" style="width:100%;max-width:380px" novalidate>
-    <h1 style="font-size:20px;margin:0 0 4px">Akademi SAP Admin Proyek</h1>
+<main class="auth">
+  <form id="f" class="card" novalidate>
+    <h1>Akademi SAP Admin Proyek</h1>
     <div class="chips" role="tablist" aria-label="Mode">
       <button type="button" class="chip on" role="tab" aria-selected="true" data-mode="login">Masuk</button>
       <button type="button" class="chip" role="tab" aria-selected="false" data-mode="register">Daftar</button>
     </div>
-    <div class="inputs" style="grid-template-columns:1fr">
+    <div class="inputs">
       <label>Username<input id="u" name="username" autocomplete="username" required minlength="3" maxlength="32" autocapitalize="none"></label>
       <label>Password<input id="p" name="password" type="password" autocomplete="current-password" required minlength="8"></label>
       <label id="invl" hidden>Kode undangan<input id="inv" name="invite" autocomplete="off"></label>
     </div>
-    <p id="msg" role="alert" aria-live="polite" style="color:#b00020;font-size:13px;min-height:1.3em;margin:10px 0"></p>
-    <button id="go" class="btn" type="submit" style="width:100%">Masuk</button>
+    <p id="msg" role="alert" aria-live="polite" class="err"></p>
+    <button id="go" class="btn" type="submit">Masuk</button>
   </form>
 </main>
 <script is:inline>

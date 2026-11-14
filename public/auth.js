@@ -6,14 +6,13 @@
     return fetch('/api/progress', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'text/plain' }, body: body, keepalive: true }).catch(function () {});
   }
   function widget(user, admin) {
+    // styled by .who in app.css; lives in the sidebar so it never covers content
     var d = document.createElement('div');
-    d.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:50;display:flex;align-items:center;gap:8px;padding:4px 4px 4px 10px;background:var(--surface);border:1px solid var(--line);border-radius:99px;font-size:12px;opacity:.85;max-width:60vw';
+    d.className = 'who';
     var n = document.createElement('span');
     n.textContent = user;
-    n.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
     var b = document.createElement('button');
     b.textContent = 'Keluar';
-    b.style.cssText = 'font:inherit;padding:3px 10px;border-radius:99px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer';
     b.onclick = function () {
       fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }).catch(function () {}).then(function () {
         ls.removeItem(KEY); ls.removeItem(USER); login();
@@ -24,11 +23,10 @@
       var a = document.createElement('a');
       a.href = '/admin';
       a.textContent = 'Admin';
-      a.style.cssText = b.style.cssText + ';text-decoration:none';
       d.append(a);
     }
     d.append(b);
-    document.body.appendChild(d);
+    (document.querySelector('#side .navwrap') || document.body).appendChild(d);
   }
   fetch('/api/progress', { credentials: 'same-origin' }).then(function (r) {
     if (r.status === 401) { login(); return null; }

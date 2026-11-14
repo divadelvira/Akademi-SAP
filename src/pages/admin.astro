@@ -12,47 +12,68 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@350;400;500;700&display=swap" rel="stylesheet">
 <style is:global>
-  .arow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .admin{min-height:100dvh;display:flex;flex-direction:column;gap:16px;align-items:center;padding:32px 16px}
+  .admin>*{width:100%;max-width:760px}
+  .admin h1{font-size:22px;margin:8px 0 4px}
+  .admin h2{font-size:18px;margin:0 0 10px}
+  .admin .hint{font-size:14px;margin:0 0 14px;color:var(--meta)}
+  .admin .meta{font-size:13px;color:var(--meta)}
+  .admin .err{color:var(--bad);font-size:14px;min-height:1.4em;margin:10px 0 0}
+  .back{font-size:14px;min-height:44px;display:flex;align-items:center}
+  #gen{width:100%}
+  #out{margin-top:14px;padding:14px;background:var(--chrome);border-radius:8px}
+  #code{font:700 22px/1.3 var(--font-m);letter-spacing:.04em;user-select:all}
+  #link{width:100%;font:16px var(--font-m);min-height:44px;padding:8px 10px;margin:4px 0 8px;border:1px solid var(--field);border-radius:8px}
+  #until{margin-left:8px}
+  .admin h2.sm{font-size:16px;margin:20px 0 6px}
+  #list{list-style:none;padding:0;margin:0;font-size:14px}
+  #list li{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+  #list li span{color:var(--meta)}
+  .arow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px;cursor:pointer}
   .arow .grow{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
-  .arow .sub{font-size:12px;opacity:.7}
-  .abadge{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:1px 8px;margin-left:6px}
-  .aedit{padding:12px;border:1px solid var(--line);border-radius:10px;margin:8px 0}
-  .aedit fieldset{border:0;margin:10px 0;padding:0;min-width:0}
-  .aedit legend{font-weight:700;font-size:13px;margin-bottom:4px;padding:0}
-  .aedit label{display:block;font-size:13px;padding:3px 0;overflow-wrap:anywhere}
-  .aedit select{max-width:100%}
-  .aedit .grp{font-size:12px;opacity:.7;margin:8px 0 2px}
+  .arow .sub{font-size:13px;color:var(--meta)}
+  .abadge{font-size:12px;font-weight:500;background:var(--band-blue);color:var(--deep);border-radius:4px;padding:1px 6px;margin-left:6px}
+  .aedit{padding:16px;background:var(--chrome);border-radius:8px;margin:8px 0}
+  .aedit fieldset{border:0;margin:12px 0;padding:0;min-width:0}
+  .aedit legend{font-weight:500;font-size:15px;color:var(--ink);margin-bottom:6px;padding:0}
+  .aedit label{display:flex;gap:10px;align-items:center;min-height:40px;font-size:15px;padding:4px 0;overflow-wrap:anywhere}
+  .aedit input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:var(--accent)}
+  .aedit select{max-width:100%;font-size:16px;min-height:44px;padding:8px 10px;border:1px solid var(--field);border-radius:8px;background:var(--bg)}
+  .aedit .grp{font-size:13px;color:var(--meta);margin:10px 0 2px}
+  .aedit .from{font-size:13px;color:var(--meta)}
+  .aedit .st{font-size:14px;margin-left:8px}
+  @media (max-width:600px){.arow .btn{flex:1 1 0}.aedit .btn,#copy{width:100%}#until{display:block;margin:8px 0 0}.aedit .st{display:block;margin:8px 0 0}}
 </style>
 </head>
 <body>
 <script is:inline type="application/json" id="catalog" set:html={JSON.stringify({ RGRP, ROLES, MODS, CATS })}></script>
-<main style="min-height:100vh;display:flex;flex-direction:column;gap:16px;align-items:center;padding:32px 16px">
-  <a href="/" style="font-size:13px;width:100%;max-width:760px">← Kembali ke aplikasi</a>
+<main class="admin">
+  <a class="back" href="/">← Kembali ke aplikasi</a>
   <div id="denied" hidden><p>Halaman ini khusus admin.</p></div>
-  <section class="card" style="width:100%;max-width:760px;box-sizing:border-box">
-    <h1 style="font-size:20px;margin:8px 0 4px">Kode undangan</h1>
-    <p style="font-size:13px;margin:0 0 14px;opacity:.75">Setiap kode hanya bisa dipakai 1 orang dan hangus setelah 30 menit.</p>
+  <section class="card">
+    <h1>Kode undangan</h1>
+    <p class="hint">Setiap kode hanya bisa dipakai 1 orang dan hangus setelah 30 menit.</p>
     <div id="panel" hidden>
-      <button id="gen" class="btn" type="button" style="width:100%">Buat kode baru</button>
-      <div id="out" hidden style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px">
-        <div style="font-size:12px;opacity:.75">Kode</div>
-        <div id="code" style="font:700 22px/1.3 ui-monospace,monospace;letter-spacing:.04em;user-select:all"></div>
-        <div style="font-size:12px;opacity:.75;margin-top:8px">Link daftar (kirim ke peserta)</div>
-        <input id="link" readonly style="width:100%;font:13px ui-monospace,monospace;margin:4px 0 8px" onfocus="this.select()">
+      <button id="gen" class="btn" type="button">Buat kode baru</button>
+      <div id="out" hidden>
+        <div class="meta">Kode</div>
+        <div id="code"></div>
+        <div class="meta">Link daftar (kirim ke peserta)</div>
+        <input id="link" readonly aria-label="Link daftar" onfocus="this.select()">
         <button id="copy" class="btn" type="button">Salin link</button>
-        <span id="until" style="font-size:12px;margin-left:8px;opacity:.75"></span>
+        <span id="until" class="meta"></span>
       </div>
-      <h2 style="font-size:15px;margin:20px 0 6px">Kode aktif</h2>
-      <ul id="list" style="list-style:none;padding:0;margin:0;font-size:13px"></ul>
+      <h2 class="sm">Kode aktif</h2>
+      <ul id="list"></ul>
     </div>
-    <p id="msg" role="alert" aria-live="polite" style="color:#b00020;font-size:13px;min-height:1.3em;margin:10px 0 0"></p>
+    <p id="msg" role="alert" aria-live="polite" class="err"></p>
   </section>
-  <section id="reqCard" class="card" hidden style="width:100%;max-width:760px;box-sizing:border-box">
-    <h2 style="font-size:18px;margin:0 0 10px">Permintaan akses</h2>
+  <section id="reqCard" class="card" hidden>
+    <h2>Permintaan akses</h2>
     <div id="reqs"></div>
   </section>
-  <section id="usrCard" class="card" hidden style="width:100%;max-width:760px;box-sizing:border-box">
-    <h2 style="font-size:18px;margin:0 0 10px">Pengguna</h2>
+  <section id="usrCard" class="card" hidden>
+    <h2>Pengguna</h2>
     <div id="usrs"></div>
   </section>
 </main>
@@ -73,12 +94,11 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
     return api('GET').then(function (d) {
       $('panel').hidden = false;
       var ul = $('list'); ul.textContent = '';
-      if (!d.invites.length) { var li = document.createElement('li'); li.textContent = 'Belum ada.'; li.style.opacity = '.6'; ul.append(li); }
+      if (!d.invites.length) { var li = document.createElement('li'); li.textContent = 'Belum ada.'; li.className = 'meta'; ul.append(li); }
       d.invites.forEach(function (i) {
         var li = document.createElement('li');
-        li.style.cssText = 'display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)';
         var c = document.createElement('code'); c.textContent = i.code;
-        var t = document.createElement('span'); t.textContent = 's.d. ' + hhmm(i.expires); t.style.opacity = '.75';
+        var t = document.createElement('span'); t.textContent = 's.d. ' + hhmm(i.expires);
         li.append(c, t); ul.append(li);
       });
     }).catch(fail);
@@ -125,21 +145,21 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
   }
   function renderReqs(reqs) {
     var box = $('reqs'); box.textContent = '';
-    if (!reqs.length) { box.append(el('p', 'Tidak ada permintaan.', 'font-size:13px;opacity:.6;margin:0')); return; }
+    if (!reqs.length) { box.append(cls(el('p', 'Tidak ada permintaan.', 'margin:0'), 'meta')); return; }
     reqs.forEach(function (r) {
       var row = cls(el('div'), 'arow');
       var info = cls(el('div'), 'grow');
       info.append(el('strong', r.user), el('div', (TYPE[r.type] || r.type) + ': ' + targetName(r)),
         cls(el('div', new Date(r.at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })), 'sub'));
-      var act = function (label, action) {
-        var b = cls(el('button', label), 'btn'); b.type = 'button';
+      var act = function (label, action, kind) {
+        var b = cls(el('button', label), 'btn' + (kind ? ' ' + kind : '')); b.type = 'button';
         b.onclick = function () {
           $('msg').textContent = ''; row.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
           adm('POST', '/api/admin/requests/' + encodeURIComponent(r.id), { action: action }).catch(fail).then(reload);
         };
         return b;
       };
-      row.append(info, act('Setujui', 'approve'), act('Tolak', 'reject'));
+      row.append(info, act('Setujui', 'approve'), act('Tolak', 'reject', 'ghost'));
       box.append(row);
     });
   }
@@ -147,7 +167,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
     var box = $('usrs'); box.textContent = '';
     users.forEach(function (u) {
       var wrap = el('div');
-      var row = cls(el('div'), 'arow'); row.style.cursor = 'pointer';
+      var row = cls(el('div'), 'arow');
       var info = cls(el('div'), 'grow');
       var nm = el('strong', u.name);
       if (u.admin) nm.append(cls(el('span', 'admin'), 'abadge'));
@@ -155,7 +175,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
       if ((u.roles || []).length) counts.push('+' + u.roles.length + ' role');
       if ((u.mods || []).length) counts.push('+' + u.mods.length + ' modul');
       info.append(nm, cls(el('div', (u.role && roleById[u.role] ? roleById[u.role].t : 'Belum pilih role') + (counts.length ? ' · ' + counts.join(' · ') : '')), 'sub'));
-      var open = cls(el('button', 'Atur'), 'btn'); open.type = 'button';
+      var open = cls(el('button', 'Atur'), 'btn ghost'); open.type = 'button';
       row.append(info, open);
       var ed = null;
       row.onclick = function () {
@@ -167,7 +187,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
   }
   function editor(u) {
     var d = cls(el('div'), 'aedit');
-    if (u.admin) { d.append(el('p', 'Admin: akses semua modul', 'margin:0;font-size:13px')); return d; }
+    if (u.admin) { d.append(el('p', 'Admin: akses semua modul', 'margin:0')); return d; }
     var sel = el('select'); sel.append(new Option('Belum pilih role', ''));
     var f1 = el('fieldset'); f1.append(el('legend', 'Role utama'), sel);
     var f2 = el('fieldset'); f2.append(el('legend', 'Role tambahan'));
@@ -183,7 +203,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
       rs.forEach(function (r) {
         var l = el('label'), c = document.createElement('input'); c.type = 'checkbox'; c.value = r.id;
         c.checked = (u.roles || []).indexOf(r.id) >= 0; c.onchange = sync;
-        roleBoxes[r.id] = c; l.append(c, ' ' + r.t); f2.append(l);
+        roleBoxes[r.id] = c; l.append(c, r.t); f2.append(l);
       });
     });
     sel.value = u.role || '';
@@ -194,8 +214,8 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
       ms.forEach(function (m) {
         var l = el('label'), c = document.createElement('input'); c.type = 'checkbox'; c.value = m.id;
         c.checked = own[m.id] = (u.mods || []).indexOf(m.id) >= 0; c.onchange = sync;
-        var hint = el('span', ' · dari role', 'font-size:12px;opacity:.7'); hint.hidden = true;
-        modBoxes[m.id] = c; hints[m.id] = hint; l.append(c, ' ' + m.code + ' · ' + m.title, hint); f3.append(l);
+        var hint = cls(el('span', '· dari role'), 'from'); hint.hidden = true;
+        modBoxes[m.id] = c; hints[m.id] = hint; l.append(c, m.code + ' · ' + m.title, hint); f3.append(l);
       });
     });
     function sync() {
@@ -216,7 +236,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
     }
     sel.onchange = sync; sync();
     var save = cls(el('button', 'Simpan'), 'btn'); save.type = 'button';
-    var st = el('span', '', 'font-size:12px;margin-left:8px');
+    var st = cls(el('span', ''), 'st');
     save.onclick = function () {
       var body = {
         role: sel.value || null,

@@ -3,6 +3,7 @@
   var A = window.__access;
   if (!A) return;
   A.requests = A.requests || [];
+  var LOCK = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
   var warned = {};
   function warn(n) { if (!warned[n]) { warned[n] = 1; console.warn('access.js: hook missing: ' + n); } }
   function q(sel) { return document.querySelector(sel); }
@@ -69,7 +70,7 @@
       var draw = function () {
         var bab = (m.lessons || []).map(function (l, i) { return '<li>Bab ' + (i + 1) + '. ' + h(l.t) + '</li>'; }).join('');
         v.innerHTML = '<header class="pagehero"><div class="eyebrow">' + h(m.code) + (needsRole() ? ' · Preview' : ' · Terkunci') + '</div><h1>' + h(m.title) + '</h1><p class="lead">' + m.sum + '</p></header>' +
-          (needsRole() ? pickNote : '<div class="callout warn"><b>🔒 Modul ini di luar role kamu.</b>Minta akses ke admin untuk membuka materi dan kuis modul ini. Simulator, studi kasus, dan flashcard tetap terbuka.</div>') +
+          (needsRole() ? pickNote : '<div class="callout warn"><b>' + LOCK + ' Modul ini di luar role kamu.</b>Minta akses ke admin untuk membuka materi dan kuis modul ini. Simulator, studi kasus, dan flashcard tetap terbuka.</div>') +
           (bab ? '<h2>Isi modul</h2><ol class="prose">' + bab + '</ol>' : '') +
           '<div class="row" style="margin-top:14px">' + (needsRole() ? '<a class="btn pri" href="#role">Pilih role</a>' : reqBtn('mod', id, 'Minta akses ke admin')) + '<a class="btn ghost" href="#modul">← Katalog modul</a></div>';
         bindReq(v, draw);
@@ -84,8 +85,8 @@
     window.modCard = function (m) {
       var s = mc.apply(this, arguments);
       if (allowed(m.id)) return s;
-      return s.replace('class="card modcard"', 'class="card modcard" style="opacity:.6"')
-        .replace('<span class="row" style="gap:4px">', '<span class="row" style="gap:4px"><span class="pill warn">🔒 Terkunci</span>');
+      return s.replace('class="card modcard"', 'class="card modcard dim"')
+        .replace('<span class="row" style="gap:4px">', '<span class="row" style="gap:4px"><span class="pill warn">' + LOCK + ' Terkunci</span>');
     };
   } else warn('modCard');
 
@@ -147,7 +148,7 @@
         sec.innerHTML = '<h2>Saran modul add-on</h2><p class="muted" style="max-width:72ch">Modul di luar role-mu yang sering dipakai role sejenis. Minta akses ke admin bila perlu.</p><div class="grid g3">' +
           ids.map(function (id) {
             var m = MOD[id];
-            return '<div class="card modcard"><div class="top"><span class="code">' + h(m.code) + ' · ' + h(m.dur) + '</span><span class="pill warn">🔒 Terkunci</span></div><h3>' + h(shortT(m)) + '</h3><p>' + m.sum + '</p>' + reqBtn('mod', id, 'Minta akses', 'sm') + '</div>';
+            return '<div class="card modcard"><div class="top"><span class="code">' + h(m.code) + ' · ' + h(m.dur) + '</span><span class="pill warn">' + LOCK + ' Terkunci</span></div><h3>' + h(shortT(m)) + '</h3><p>' + m.sum + '</p>' + reqBtn('mod', id, 'Minta akses', 'sm') + '</div>';
           }).join('') + '</div>';
         bindReq(sec, draw);
       };
