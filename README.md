@@ -14,7 +14,7 @@ Production: https://sap-learn.pages.dev
 
 1. One time only: `npx wrangler login`
 2. Set secrets (one time): `npx wrangler pages secret put SESSION_SECRET` and `npx wrangler pages secret put INVITE_CODE`
-3. Build and deploy: `npm run deploy` (runs `wrangler pages deploy`)
+3. Deploys happen automatically on push to `main` (see CI/CD). `npm run deploy` is only a manual fallback.
 
 Deploy from `main` only.
 
@@ -27,9 +27,9 @@ Deploy from `main` only.
 
 ### CI/CD
 
-`.github/workflows/ci.yml` runs test + build on PRs and deploys a preview to `<branch>.sap-learn.pages.dev`. A push to `main` deploys production.
-
-One-time setup (repo owner): add repo secrets `CLOUDFLARE_API_TOKEN` (Cloudflare dashboard > My Profile > API Tokens > Create; permission Account > Cloudflare Pages > Edit) and `CLOUDFLARE_ACCOUNT_ID`.
+- **Deploy:** Cloudflare Pages is connected to this GitHub repo. A push to `main` builds (`npm run build`, output `dist`) and deploys production; every PR gets a preview URL posted by Cloudflare.
+- **Checks:** `.github/workflows/ci.yml` runs `npm test` + `npm run build` on PRs and on `main`. No Cloudflare token is needed in GitHub.
+- Build uses Node 24 (`.node-version`). KV binding comes from `wrangler.jsonc`; secrets `SESSION_SECRET` and `INVITE_CODE` live in the Pages project settings.
 
 ## 3. Project layout
 
