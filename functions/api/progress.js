@@ -1,9 +1,10 @@
-import { json, err } from "../_lib/auth.js";
+import { json, err, isAdmin } from "../_lib/auth.js";
 
 const MAX = 256 * 1024;
 
 export async function onRequestGet({ env, data }) {
-  return json({ user: data.user, progress: await env.DATA.get(`progress:${data.user}`) });
+  const [progress, admin] = await Promise.all([env.DATA.get(`progress:${data.user}`), isAdmin(env, data.user)]);
+  return json({ user: data.user, admin, progress });
 }
 
 async function save({ request, env, data }) {

@@ -73,3 +73,6 @@ export const err = (message, status) => json({ error: message }, status);
 export async function readJson(request) {
   try { return (await request.json()) ?? {}; } catch { return null; }
 }
+
+export const INVITE_TTL = 1800; // 30 minutes
+export const isAdmin = async (env, user) => !!user && (await env.DATA.get(`user:${user}`, "json"))?.admin === true;

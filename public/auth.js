@@ -5,7 +5,7 @@
   function put(body) {
     return fetch('/api/progress', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'text/plain' }, body: body, keepalive: true }).catch(function () {});
   }
-  function widget(user) {
+  function widget(user, admin) {
     var d = document.createElement('div');
     d.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:50;display:flex;align-items:center;gap:8px;padding:4px 4px 4px 10px;background:var(--surface);border:1px solid var(--line);border-radius:99px;font-size:12px;opacity:.85;max-width:60vw';
     var n = document.createElement('span');
@@ -19,7 +19,15 @@
         ls.removeItem(KEY); ls.removeItem(USER); login();
       });
     };
-    d.append(n, b);
+    d.append(n);
+    if (admin) {
+      var a = document.createElement('a');
+      a.href = '/admin';
+      a.textContent = 'Admin';
+      a.style.cssText = b.style.cssText + ';text-decoration:none';
+      d.append(a);
+    }
+    d.append(b);
     document.body.appendChild(d);
   }
   fetch('/api/progress', { credentials: 'same-origin' }).then(function (r) {
@@ -47,7 +55,7 @@
       var v = ls.getItem(KEY);
       if (v !== null) navigator.sendBeacon('/api/progress', new Blob([v], { type: 'text/plain' }));
     });
-    widget(d.user);
+    widget(d.user, d.admin);
     // app.js reads localStorage synchronously at its top, so it loads last.
     var s = document.createElement('script');
     s.src = '/app.js';

@@ -1,0 +1,79 @@
+---
+import '../styles/app.css';
+---
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Akademi SAP Admin Proyek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@350;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<main style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px">
+  <section class="card" style="width:100%;max-width:460px">
+    <a href="/" style="font-size:13px">← Kembali ke aplikasi</a>
+    <h1 style="font-size:20px;margin:8px 0 4px">Kode undangan</h1>
+    <p style="font-size:13px;margin:0 0 14px;opacity:.75">Setiap kode hanya bisa dipakai 1 orang dan hangus setelah 30 menit.</p>
+    <div id="denied" hidden><p>Halaman ini khusus admin.</p></div>
+    <div id="panel" hidden>
+      <button id="gen" class="btn" type="button" style="width:100%">Buat kode baru</button>
+      <div id="out" hidden style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px">
+        <div style="font-size:12px;opacity:.75">Kode</div>
+        <div id="code" style="font:700 22px/1.3 ui-monospace,monospace;letter-spacing:.04em;user-select:all"></div>
+        <div style="font-size:12px;opacity:.75;margin-top:8px">Link daftar (kirim ke peserta)</div>
+        <input id="link" readonly style="width:100%;font:13px ui-monospace,monospace;margin:4px 0 8px" onfocus="this.select()">
+        <button id="copy" class="btn" type="button">Salin link</button>
+        <span id="until" style="font-size:12px;margin-left:8px;opacity:.75"></span>
+      </div>
+      <h2 style="font-size:15px;margin:20px 0 6px">Kode aktif</h2>
+      <ul id="list" style="list-style:none;padding:0;margin:0;font-size:13px"></ul>
+    </div>
+    <p id="msg" role="alert" aria-live="polite" style="color:#b00020;font-size:13px;min-height:1.3em;margin:10px 0 0"></p>
+  </section>
+</main>
+<script is:inline>
+  var $ = function (id) { return document.getElementById(id); };
+  var hhmm = function (t) { return new Date(t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }); };
+  var link = function (c) { return location.origin + '/login?invite=' + c; };
+  function api(method) {
+    return fetch('/api/invites', { method: method, credentials: 'same-origin' }).then(function (r) {
+      if (r.status === 401) { location.href = '/login'; throw 0; }
+      if (r.status === 403) { $('denied').hidden = false; $('panel').hidden = true; throw 0; }
+      if (!r.ok) throw new Error();
+      return r.json();
+    });
+  }
+  function fail(e) { if (e !== 0) $('msg').textContent = 'Terjadi kesalahan, coba lagi'; }
+  function load() {
+    return api('GET').then(function (d) {
+      $('panel').hidden = false;
+      var ul = $('list'); ul.textContent = '';
+      if (!d.invites.length) { var li = document.createElement('li'); li.textContent = 'Belum ada.'; li.style.opacity = '.6'; ul.append(li); }
+      d.invites.forEach(function (i) {
+        var li = document.createElement('li');
+        li.style.cssText = 'display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)';
+        var c = document.createElement('code'); c.textContent = i.code;
+        var t = document.createElement('span'); t.textContent = 's.d. ' + hhmm(i.expires); t.style.opacity = '.75';
+        li.append(c, t); ul.append(li);
+      });
+    }).catch(fail);
+  }
+  $('gen').onclick = function () {
+    $('gen').disabled = true; $('msg').textContent = '';
+    api('POST').then(function (d) {
+      $('code').textContent = d.code; $('link').value = link(d.code);
+      $('until').textContent = 'Berlaku s.d. ' + hhmm(d.expires);
+      $('copy').textContent = 'Salin link'; $('out').hidden = false;
+      return load();
+    }).catch(fail).then(function () { $('gen').disabled = false; });
+  };
+  $('copy').onclick = function () {
+    navigator.clipboard.writeText($('link').value).then(function () { $('copy').textContent = 'Tersalin ✓'; }, function () { $('link').focus(); });
+  };
+  load();
+</script>
+</body>
+</html>
