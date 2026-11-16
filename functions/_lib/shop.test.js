@@ -24,12 +24,12 @@ const prog = async (e, user = "ani") => (await call(progress.onRequestGet, e, us
 const wallet = async (e) => JSON.parse(await e.DATA.get("progress:ani")).wallet;
 
 test("redeem a reward: enough coins deducts and records; too few is refused", async () => {
-  const e = await env(400);
+  const e = await env(600);
   const [s, d] = await res(await call(redeem.onRequestPost, e, "ani", { reward: "ps" }));
   assert.equal(s, 200);
-  assert.equal(d.coins, 100);
+  assert.equal(d.coins, 150);
   assert.match(d.entry.code, /^JCW-[0-9A-F]{7}$/);
-  assert.equal((await wallet(e)).spent, 300);
+  assert.equal((await wallet(e)).spent, 450);
   assert.equal((await wallet(e)).red[0].code, d.entry.code);
   assert.equal((await call(redeem.onRequestPost, e, "ani", { reward: "ps" })).status, 409);
   assert.equal((await call(redeem.onRequestPost, e, "ani", { reward: "nope" })).status, 404);
@@ -60,7 +60,7 @@ test("coupon costing more than the balance is refused and stays unused", async (
 });
 
 test("admin marks a redemption done; user sees it, admin count drops", async () => {
-  const e = await env(200);
+  const e = await env(300);
   const [, { entry }] = await res(await call(redeem.onRequestPost, e, "ani", { reward: "cv" }));
   assert.deepEqual((await prog(e)).done, []);
   assert.equal((await call(rdmDone.onRequestPost, e, "diva", { action: "done" }, { id: entry.code })).status, 200);
@@ -86,7 +86,7 @@ test("admin user detail shows EXP snapshot, coins and redemptions; settings stor
   await call(redeem.onRequestPost, e, "ani", { reward: "cl" });
   assert.equal((await call(adminUser.onRequestGet, e, "ani", null, { name: "ani" })).status, 403);
   const [, d] = await res(await call(adminUser.onRequestGet, e, "diva", null, { name: "ani" }));
-  assert.deepEqual(d.wallet, { conv: 2000, spent: 50, earned: 400, coins: 350 });
+  assert.deepEqual(d.wallet, { conv: 2000, spent: 150, earned: 400, coins: 250 });
   assert.equal(d.xp.total, 2000);
   assert.equal(d.redeemed[0].t, "Cover Letter");
   assert.equal((await call(settings.onRequestPut, e, "diva", { wa: "0812-3456-7890" })).status, 200);

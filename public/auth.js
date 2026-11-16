@@ -27,7 +27,10 @@
       if (notif) { var nb = document.createElement('b'); nb.className = 'nbadge'; nb.textContent = notif; nb.title = notif + ' notifikasi baru'; a.append(nb); }
       d.append(a);
     }
-    d.append(b);
+    var pw = document.createElement('a');
+    pw.href = '/password';
+    pw.textContent = 'Ganti password';
+    d.append(pw, b);
     (document.querySelector('#side .navwrap') || document.body).appendChild(d);
   }
   fetch('/api/progress', { credentials: 'same-origin' }).then(function (r) {
