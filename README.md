@@ -10,7 +10,7 @@ Static Astro 7 site, deployed to Cloudflare Pages (Pages Functions handle login 
 
 ## 2. Deploy
 
-Production: https://sap-learn.pages.dev
+Production: https://akademi-sap.pages.dev
 
 1. One time only: `npx wrangler login`
 2. Set the secret (one time): `npx wrangler pages secret put SESSION_SECRET`
