@@ -13,7 +13,10 @@ import '../styles/app.css';
 <style is:inline>[hidden]{display:none!important}
   .auth{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:16px}
   .auth form{width:100%;max-width:380px}
-  .auth h1{font-size:22px;margin:0 0 4px}
+  .auth-brand{font-size:24px;font-weight:800;color:var(--ink);text-align:center;margin:0 0 16px}
+  .auth-brand em{color:var(--deep);font-style:normal}
+  .auth-brand small{display:block;font-size:13px;font-weight:500;color:var(--meta)}
+  .auth h1{font-size:20px;margin:0 0 8px}
   .auth .inputs{grid-template-columns:1fr}
   .auth .err{color:var(--bad);font-size:14px;min-height:1.4em;margin:10px 0}
   .auth .btn{width:100%}
@@ -22,7 +25,8 @@ import '../styles/app.css';
 <body>
 <main class="auth">
   <form id="f" class="card" novalidate>
-    <h1>Akademi SAP</h1>
+    <div class="auth-brand">Akademi <em>SAP</em><small>by JACIWEY Studio</small></div>
+    <h1>Selamat datang</h1>
     <div class="chips" role="tablist" aria-label="Mode">
       <button type="button" class="chip on" role="tab" aria-selected="true" data-mode="login">Masuk</button>
       <button type="button" class="chip" role="tab" aria-selected="false" data-mode="register">Daftar</button>
