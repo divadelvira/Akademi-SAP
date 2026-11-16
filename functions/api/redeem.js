@@ -1,6 +1,6 @@
 import { json, err, readJson } from "../_lib/auth.js";
 import { REWARDS } from "../_lib/catalog.js";
-import { parseProgress, coinsOf, newCode, COUPON_RE } from "../_lib/shop.js";
+import { parseProgress, coinsOf, newCode, COUPON_RE, getSettings } from "../_lib/shop.js";
 
 // Body {reward:id} or {coupon:code}. The client flushes its progress first, so the stored wallet is current.
 export async function onRequestPost({ request, env, data }) {
@@ -9,6 +9,8 @@ export async function onRequestPost({ request, env, data }) {
   if (typeof b?.reward === "string") {
     item = REWARDS.find((r) => r.id === b.reward);
     if (!item) return err("Reward tidak ditemukan", 404);
+    const price = (await getSettings(env)).prices?.[item.id];
+    if (price > 0) item = { ...item, cost: price };
   } else if (typeof b?.coupon === "string") {
     const code = b.coupon.trim().toUpperCase();
     key = `coupon:${code}`;

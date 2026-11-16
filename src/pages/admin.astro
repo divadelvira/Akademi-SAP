@@ -1,6 +1,6 @@
 ---
 import '../styles/app.css';
-import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
+import { RGRP, ROLES, MODS, CATS, REWARDS, EXP } from '../../functions/_lib/catalog.js';
 ---
 <!doctype html>
 <html lang="id">
@@ -50,6 +50,11 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
   .admin form.inl label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--meta);flex:1 1 160px}
   .admin form.inl input{min-height:44px;padding:8px 10px;font-size:16px;border:1px solid var(--field);border-radius:8px;background:var(--bg);color:var(--ink)}
   .admin form.inl .btn{margin:0}
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .pgrid label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--meta)}
+  .pgrid input{min-height:44px;padding:8px 10px;font-size:16px;border:1px solid var(--field);border-radius:8px;background:var(--bg);color:var(--ink)}
+  .admin .inl{display:flex;flex-wrap:wrap;gap:10px}
+  .admin .inl .btn{margin:0}
   .done{opacity:.6}
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:0 0 12px}
   .stats div{padding:10px 12px;background:var(--bg);border-radius:8px}
@@ -62,7 +67,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
 </style>
 </head>
 <body>
-<script is:inline type="application/json" id="catalog" set:html={JSON.stringify({ RGRP, ROLES, MODS, CATS })}></script>
+<script is:inline type="application/json" id="catalog" set:html={JSON.stringify({ RGRP, ROLES, MODS, CATS, REWARDS, EXP })}></script>
 <main class="admin">
   <a class="back" href="/">← Kembali ke aplikasi</a>
   <div id="denied" hidden><p>Halaman ini khusus admin.</p></div>
@@ -111,6 +116,23 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
       <button class="btn">Simpan</button>
     </form>
     <p id="waSt" class="meta" role="status"></p>
+  </section>
+  <section id="prcCard" class="card" hidden>
+    <h2>Harga reward & EXP</h2>
+    <p class="hint">Berlaku untuk semua peserta saat halaman mereka dimuat ulang. Voucher yang sudah ditukar tidak berubah.</p>
+    <form id="prcForm">
+      <h3>Harga reward (koin)</h3>
+      <div id="prcList" class="pgrid"></div>
+      <h3>Perolehan EXP</h3>
+      <p class="meta">Total EXP dibagi ke semua aktivitas sesuai bobotnya. Bobot hanya menentukan porsi: aktivitas berbobot 80 dapat 2× EXP aktivitas berbobot 40.</p>
+      <div class="pgrid">
+        <label>Total EXP maksimal (semua role)<input id="xMax" type="number" inputmode="numeric" min="5000" max="1000000" step="1" required></label>
+        <label>EXP per misi Simulator bebas<input id="xFree" type="number" inputmode="numeric" min="0" max="100" step="1" required></label>
+      </div>
+      <div id="wList" class="pgrid"></div>
+      <div class="inl" style="margin-top:12px"><button class="btn">Simpan</button><button type="button" class="btn ghost" id="prcDef">Isi nilai default</button></div>
+      <p id="prcSt" class="meta" role="status"></p>
+    </form>
   </section>
   <section id="usrCard" class="card" hidden>
     <h2>Pengguna</h2>
@@ -185,9 +207,10 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
   }
   function reload() {
     return adm('GET', '/api/admin/users').then(function (d) {
-      ['reqCard', 'usrCard', 'cpnCard', 'waCard'].forEach(function (id) { $(id).hidden = false; });
+      ['reqCard', 'usrCard', 'cpnCard', 'waCard', 'prcCard'].forEach(function (id) { $(id).hidden = false; });
       notifs(d); renderUsers(d.users);
       if (document.activeElement !== $('waNum')) $('waNum').value = (d.settings && d.settings.wa) || '';
+      if (!prcLoaded) { prcLoaded = true; fillPrc(d.settings || {}); }
       return loadCoupons();
     }).catch(fail);
   }
@@ -250,6 +273,26 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
     adm('PUT', '/api/admin/settings', { wa: $('waNum').value }).then(function (d) {
       $('waNum').value = d.wa; $('waSt').textContent = d.wa ? 'Tersimpan ✓ wa.me/' + d.wa : 'WhatsApp dimatikan';
     }).catch(function (x) { if (x !== 0) $('waSt').textContent = x.message || 'Gagal menyimpan'; });
+  };
+  // Reward prices and EXP settings. Filled once from the server so polling never resets what the admin is typing.
+  var prcLoaded = false, numIn = function (id, min, max) { var i = el('input'); i.id = id; i.type = 'number'; i.inputMode = 'numeric'; i.min = min; i.max = max; i.step = 1; i.required = true; return i; };
+  CAT.REWARDS.forEach(function (r) { var l = el('label', r.t); l.append(numIn('p-' + r.id, 1, 100000)); $('prcList').append(l); });
+  Object.keys(CAT.EXP.w).forEach(function (k) { var l = el('label', 'Bobot: ' + CAT.EXP.labels[k]); l.append(numIn('w-' + k, 0, 1000)); $('wList').append(l); });
+  function fillPrc(s) {
+    var p = s.prices || {}, x = s.exp || CAT.EXP, w = x.w || CAT.EXP.w;
+    CAT.REWARDS.forEach(function (r) { $('p-' + r.id).value = p[r.id] || r.cost; });
+    $('xMax').value = x.max; $('xFree').value = x.free;
+    Object.keys(CAT.EXP.w).forEach(function (k) { $('w-' + k).value = w[k] != null ? w[k] : CAT.EXP.w[k]; });
+  }
+  $('prcDef').onclick = function () { fillPrc({}); $('prcSt').textContent = 'Nilai default terisi. Klik Simpan untuk menerapkan.'; };
+  $('prcForm').onsubmit = function (e) {
+    e.preventDefault(); $('prcSt').textContent = '';
+    var n = function (id) { return Number($(id).value); }, prices = {}, w = {};
+    CAT.REWARDS.forEach(function (r) { prices[r.id] = n('p-' + r.id); });
+    Object.keys(CAT.EXP.w).forEach(function (k) { w[k] = n('w-' + k); });
+    adm('PUT', '/api/admin/settings', { prices: prices, exp: { max: n('xMax'), free: n('xFree'), w: w } }).then(function (d) {
+      fillPrc(d); $('prcSt').textContent = 'Tersimpan ✓ Peserta melihat angka baru setelah memuat ulang halaman.';
+    }).catch(function (x) { if (x !== 0) $('prcSt').textContent = x.message || 'Gagal menyimpan'; });
   };
   // Per-user EXP, coins and redemptions (read-only).
   function detail(u) {
