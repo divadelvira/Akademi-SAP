@@ -1,4 +1,4 @@
-# Akademi SAP Admin Proyek
+# Akademi SAP
 
 Static Astro 7 site, deployed to Cloudflare Pages (Pages Functions handle login and progress). Content was migrated from the Claude artifact "Akademi SAP Admin Proyek".
 
