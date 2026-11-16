@@ -5,7 +5,7 @@
   function put(body) {
     return fetch('/api/progress', { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'text/plain' }, body: body, keepalive: true }).catch(function () {});
   }
-  function widget(user, admin) {
+  function widget(user, admin, notif) {
     // styled by .who in app.css; lives in the sidebar so it never covers content
     var d = document.createElement('div');
     d.className = 'who';
@@ -23,6 +23,8 @@
       var a = document.createElement('a');
       a.href = '/admin';
       a.textContent = 'Admin';
+      // pending access requests + rewards waiting to be handed over
+      if (notif) { var nb = document.createElement('b'); nb.className = 'nbadge'; nb.textContent = notif; nb.title = notif + ' notifikasi baru'; a.append(nb); }
       d.append(a);
     }
     d.append(b);
@@ -53,8 +55,8 @@
       var v = ls.getItem(KEY);
       if (v !== null) navigator.sendBeacon('/api/progress', new Blob([v], { type: 'text/plain' }));
     });
-    widget(d.user, d.admin);
-    window.__access = { admin: !!d.admin, role: d.role || null, roles: d.roles || [], mods: d.mods || [], requests: d.requests || [] };
+    widget(d.user, d.admin, d.notif);
+    window.__access = { user: d.user, admin: !!d.admin, role: d.role || null, roles: d.roles || [], mods: d.mods || [], requests: d.requests || [], wa: d.wa || null, done: d.done || [] };
     // app.js reads localStorage synchronously at its top, so it loads last; access.js wraps its renderers after.
     var s = document.createElement('script');
     s.src = '/app.js';

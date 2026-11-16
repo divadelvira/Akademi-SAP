@@ -1,5 +1,6 @@
 import { json, err, isAdmin } from "../../_lib/auth.js";
 import { loadUser, pendingRequests } from "../../_lib/access.js";
+import { redemptions, getSettings } from "../../_lib/shop.js";
 
 export async function onRequestGet({ env, data }) {
   if (!(await isAdmin(env, data.user))) return err("Khusus admin", 403);
@@ -10,5 +11,6 @@ export async function onRequestGet({ env, data }) {
     return { name, admin: u?.admin === true, role: u?.role ?? null, roles: u?.roles ?? [], mods: u?.mods ?? [] };
   }));
   users.sort((a, b) => a.name.localeCompare(b.name));
-  return json({ users, requests: await pendingRequests(env) });
+  const [requests, rdm, settings] = await Promise.all([pendingRequests(env), redemptions(env), getSettings(env)]);
+  return json({ users, requests, redemptions: rdm, settings });
 }
