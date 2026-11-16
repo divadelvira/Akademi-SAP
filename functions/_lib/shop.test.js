@@ -27,9 +27,9 @@ test("redeem a reward: enough coins deducts and records; too few is refused", as
   const e = await env(600);
   const [s, d] = await res(await call(redeem.onRequestPost, e, "ani", { reward: "ps" }));
   assert.equal(s, 200);
-  assert.equal(d.coins, 150);
+  assert.equal(d.coins, 100);
   assert.match(d.entry.code, /^JCW-[0-9A-F]{7}$/);
-  assert.equal((await wallet(e)).spent, 450);
+  assert.equal((await wallet(e)).spent, 500);
   assert.equal((await wallet(e)).red[0].code, d.entry.code);
   assert.equal((await call(redeem.onRequestPost, e, "ani", { reward: "ps" })).status, 409);
   assert.equal((await call(redeem.onRequestPost, e, "ani", { reward: "nope" })).status, 404);
@@ -95,4 +95,24 @@ test("admin user detail shows EXP snapshot, coins and redemptions; settings stor
   const [, all] = await res(await call(adminUsers.onRequestGet, e, "diva"));
   assert.equal(all.redemptions.length, 1);
   assert.equal(all.settings.wa, "6281234567890");
+});
+
+test("admin sets reward prices and EXP; redeem charges the new price; bad input refused", async () => {
+  const { REWARDS, EXP } = await import("./catalog.js");
+  const e = await env(300);
+  const prices = Object.fromEntries(REWARDS.map((r) => [r.id, r.cost]));
+  assert.equal((await call(settings.onRequestPut, e, "ani", { prices })).status, 403);
+  assert.equal((await call(settings.onRequestPut, e, "diva", { prices: { ...prices, ps: 0 } })).status, 400);
+  assert.equal((await call(settings.onRequestPut, e, "diva", { prices: { ...prices, ps: 120 } })).status, 200);
+  assert.equal((await call(settings.onRequestPut, e, "diva", { exp: { ...EXP, max: 100 } })).status, 400);
+  assert.equal((await call(settings.onRequestPut, e, "diva", { exp: { ...EXP, w: Object.fromEntries(Object.keys(EXP.w).map((k) => [k, 0])) } })).status, 400);
+  const [s, saved] = await res(await call(settings.onRequestPut, e, "diva", { exp: { max: 30000, free: 25, w: { ...EXP.w, rx: 100 } } }));
+  assert.equal(s, 200);
+  assert.deepEqual(saved.exp, { max: 30000, free: 25, w: { ...EXP.w, rx: 100 } });
+  assert.equal(saved.prices.ps, 120);
+  const p = await prog(e);
+  assert.equal(p.prices.ps, 120);
+  assert.equal(p.exp.max, 30000);
+  const [, d] = await res(await call(redeem.onRequestPost, e, "ani", { reward: "ps" }));
+  assert.equal(d.coins, 180);
 });

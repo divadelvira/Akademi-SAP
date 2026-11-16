@@ -4066,7 +4066,7 @@ setInterval(()=>{if(MQ_RM.matches||document.hidden)return;$$('[data-ctx][data-au
 /* ===================== EXP, KOIN & REWARD =====================
    Semua EXP dihitung ulang dari progres (tidak bisa dobel).
    Maksimum total tepat 25.000 EXP bila semua modul, role, ujian, kartu, dan misi selesai sempurna. */
-const EXP_MAX=25000, COIN_RATE=5, FREE_EXP=20;
+let EXP_MAX=25000, FREE_EXP=20;const COIN_RATE=5;
 const EXPW={read:5,cp:10,bsim:30,bcase:20,mx:60,rsim:50,rcase:40,rx:80,rdone:50};
 const EXP_LABEL={read:'Membaca satu bab',cp:'Cek pemahaman bab benar di percobaan pertama',bsim:'Simulator bab (proporsional bintang, ★★★ penuh)',bcase:'Studi kasus bab (proporsional skor)',mx:'Ujian akhir modul (proporsional nilai terbaik)',rsim:'Simulator role (proporsional bintang)',rcase:'Studi kasus role (proporsional skor)',rx:'Ujian akhir role (proporsional nilai terbaik)',rdone:'Bonus role tuntas (semua modul inti & general dikuasai)'};
 const REWARDS=[
@@ -4074,16 +4074,18 @@ const REWARDS=[
  ['lb','Banner LinkedIn',200,'Desain banner profil LinkedIn.','doc','banner'],
  ['cv','1 CV gratis',250,'Satu CV ATS-friendly.','doc','cv'],
  ['lr','Rebranding LinkedIn',500,'Siap rework LinkedIn kamu untuk tampil lebih menarik.','doc','rebrand'],
- ['pm','PPT make over',650,'Merapikan desain presentasi yang sudah kamu punya.','ppt','pptfix','Maks. 10 slide'],
- ['pt','PPT Personal',1200,'PPT untuk tugas/project/sidang kamu.','ppt','ppt','Maks. 15 slide'],
- ['pp','PPT Portfolio',1450,'Portfolio dalam bentuk PPT/PDF.','ppt','pptport'],
- ['pa','+ Panel Admin',900,'Add-on panel admin buat website portfolio atau website custom dasarmu, tanpa coding sendiri.','web','admin'],
- ['pw','Portfolio Web',3200,'Portfolio dalam bentuk website (tanpa panel admin).','web','web'],
+ ['pm','PPT make over',750,'Merapikan desain presentasi yang sudah kamu punya.','ppt','pptfix','Maks. 10 slide'],
+ ['pt','PPT Personal',1350,'PPT untuk tugas/project/sidang kamu.','ppt','ppt','Maks. 15 slide'],
+ ['pp','PPT Portfolio',1500,'Portfolio dalam bentuk PPT/PDF.','ppt','pptport'],
+ ['pa','+ Panel Admin',1000,'Add-on panel admin buat website portfolio atau website custom dasarmu, tanpa coding sendiri.','web','admin'],
+ ['pw','Portfolio Web',3250,'Portfolio dalam bentuk website (tanpa panel admin).','web','web'],
  ['wb','Web Custom Basic',3600,'Website fungsional yang disesuaikan dengan kebutuhan kamu.','web','webcode'],
- ['ps','Platform Belajar Psikotes',450,'Akses ke platform belajar Psikotes-nya JACIWEY.','pkt','psiko'],
- ['ck','Career Lite',1000,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','case'],
+ ['ps','Platform Belajar Psikotes',500,'Akses ke platform belajar Psikotes-nya JACIWEY.','pkt','psiko'],
+ ['ck','Career Lite',1250,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','case'],
  ['kt','Career Kit',3750,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','casek'],
  ['kp','Career Kit Plus',4500,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','rocket']];
+// Admin overrides from the panel (settings.prices / settings.exp), set on window.__access by auth.js before this file loads.
+{const A=window.__access||{},X=A.exp||{};REWARDS.forEach(x=>{const c=A.prices&&A.prices[x[0]];if(c>0)x[2]=c;});if(X.max>0)EXP_MAX=X.max;if(X.free>=0)FREE_EXP=X.free;Object.assign(EXPW,X.w);}
 const RWCAT=[['doc','Dokumen karier'],['ppt','Presentasi'],['web','Website'],['pkt','Belajar & paket Career']];
 const RWICO={
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7.5 9 6 9-6"/>',
