@@ -2063,6 +2063,7 @@ const MAT={
 };
 const F4={
 knttp:[['K','Cost center'],['P','Project (WBS element)'],['F','Order'],['A','Asset']],
+pstyp:[['','(kosong) Standard'],['D','Service'],['K','Consignment'],['L','Subcontracting']],
 matnr:Object.entries(MAT).map(([k,v])=>[k,v.d]),
 werks:[['1100','Pabrik Cikarang'],['1200','Pabrik Surabaya']],
 lgort:[['1101','Gudang Sparepart'],['1102','Gudang Proyek'],['1103','Gudang Bahan Baku']],
@@ -2201,7 +2202,7 @@ steps:[
 screens:[{title:'Create Purchase Requisition',go:'save',checkOk:'No messages issued during check',def:{bsart:'NB'},
 blocks:[
  {t:'bar',fields:[{id:'bsart',l:'Document type',t:'sel',opts:[['NB','Purchase Requisition'],['FO','Framework Requisition']]},{id:'srcdet',l:'Source determination',t:'chk'}]},
- {t:'items',key:'it',title:'Item Overview',rows:3,cols:[{id:'itm',l:'Itm',ro:1,v:r=>(r+1)*10},{id:'knttp',l:'A',w:2,f4:'knttp'},{id:'pstyp',l:'I',w:2},{id:'mat',l:'Material',w:11,f4:'matnr'},{id:'txt',l:'Short Text',ro:1},{id:'qty',l:'Quantity',w:6},{id:'un',l:'Un',ro:1},{id:'date',l:'Deliv. Date',w:10},{id:'werks',l:'Plant',w:5,f4:'werks'},{id:'lgort',l:'SLoc',w:5,f4:'lgort'},{id:'ekgrp',l:'PGr',w:4,f4:'ekgrp'}]},
+ {t:'items',key:'it',title:'Item Overview',rows:3,cols:[{id:'itm',l:'Itm',ro:1,v:r=>(r+1)*10},{id:'knttp',l:'A',w:2,f4:'knttp'},{id:'pstyp',l:'I',w:2,f4:'pstyp'},{id:'mat',l:'Material',w:11,f4:'matnr'},{id:'txt',l:'Short Text',ro:1},{id:'qty',l:'Quantity',w:6},{id:'un',l:'Un',ro:1},{id:'date',l:'Deliv. Date',w:10},{id:'werks',l:'Plant',w:5,f4:'werks'},{id:'lgort',l:'SLoc',w:5,f4:'lgort'},{id:'ekgrp',l:'PGr',w:4,f4:'ekgrp'}]},
  {t:'tabs',key:'det',title:v=>'Item  [ 10 ]  '+(v['it.0.mat']||'')+'  '+(v['it.0.txt']||''),tabs:[
    {l:'Material Data',fields:[{id:'it.0.mat',l:'Material',t:'ro'},{id:'it.0.txt',l:'Short text',t:'ro'},{id:'it.0.mg',l:'Material Group',t:'ro'}]},
    {l:'Quantities/Dates',fields:[{id:'it.0.qty',l:'Quantity',w:8},{id:'it.0.date',l:'Delivery date',w:10}]},
@@ -2212,9 +2213,9 @@ blocks:[
 onEnter:v=>{const out={};if(v['it.0.mat']){const f=matFill('it.0.',v);if(!f)return {msg:['E',`Material ${v['it.0.mat']} does not exist`],explain:'Nomor material tidak ditemukan. Pakai F4 untuk mencari.'};Object.assign(out,f);}
   if(norm(v['it.0.knttp'])==='P')out['it.0.gl']='510100';
   return {fill:out,msg:out['it.0.txt']&&norm(v['it.0.knttp'])==='P'&&!v['it.0.wbs']?['I','Item 10: enter account assignment on tab Account Assignment']:null};},
-expect:{bsart:'NB','it.0.knttp':'P','it.0.mat':'300012457','it.0.txt':NEED_ENTER('material'),'it.0.qty':'10','it.0.date':DATE_FUT,'it.0.werks':'1100','it.0.lgort':'1101','it.0.ekgrp':'P05',
+expect:{bsart:'NB','it.0.knttp':'P','it.0.pstyp':{fn:v=>norm(v)===''?null:{sap:'Item category not allowed for material',idn:'PR material: kolom I (Item category) dikosongkan. Isi D hanya untuk PR jasa (service).'}},'it.0.mat':'300012457','it.0.txt':NEED_ENTER('material'),'it.0.qty':'10','it.0.date':DATE_FUT,'it.0.werks':'1100','it.0.lgort':'1101','it.0.ekgrp':'P05',
   'it.0.wbs':{eq:'P-26-014.02',sap:'Enter WBS element',idn:'Karena A = P, SAP wajib meminta WBS. Buka tab Account Assignment di Item Detail. WBS material mekanikal adalah P-26-014.02 (F4).'},'it.0.afnam':{eq:'HENDRA',idn:'Isi nama pemohon di tab Contact Person → Requisitioner.'}},
-hints:{'it.0.knttp':'Proyek → P','it.0.mat':'F4 → "6205"','it.0.date':'Tanggal dari brief','it.0.ekgrp':'Project & Engineering','it.0.wbs':'Tab Account Assignment','it.0.afnam':'Tab Contact Person'},
+hints:{'it.0.knttp':'Proyek → P','it.0.pstyp':'Material → kosongkan (D = jasa)','it.0.mat':'F4 → "6205"','it.0.date':'Tanggal dari brief','it.0.ekgrp':'Project & Engineering','it.0.wbs':'Tab Account Assignment','it.0.afnam':'Tab Contact Person'},
 warn:v=>{const d=dParse(v['it.0.date']);return d&&d<dParse('18.11.2026')?{sap:'Delivery date cannot be met (planned delivery time 14 days)',idn:'Ini warning, bukan error. Lead time vendor 14 hari sehingga tanggal 12.11.2026 kemungkinan tidak terkejar. Tekan Enter untuk tetap menyimpan, lalu kabari Procurement dan supervisor bahwa barang mendesak.'}:null;},
 ok:'Purchase requisition number 10004587 created'}]},
 {k:'q',instr:'PR 10004587 tersimpan dengan warning lead time. Tindakan yang paling tepat setelah ini?',o:['Kabari Procurement & supervisor bahwa PR mendesak (lead time 14 hari), lalu pantau di ME5A','Buat PR kedua supaya cepat','Hapus PR','Tidak perlu apa-apa'],a:0,e:'Warning adalah sinyal untuk dikomunikasikan. Pantau release dan nomor PO di ME5A.'}
@@ -2544,7 +2545,7 @@ screens:[
 {title:'Change Purchase Requisition 10004587',go:'save',checkOk:'No messages issued during check',
  def:{bsart:'NB','it.0.knttp':'P','it.0.mat':'300012457','it.0.txt':'BEARING SKF 6205-2RS','it.0.qty':'10','it.0.un':'PC','it.0.date':'12.11.2026','it.0.werks':'1100','it.0.lgort':'1101','it.0.ekgrp':'P05','it.0.wbs':'P-26-014.02','it.0.rel':'Not released'},
  blocks:[{t:'bar',fields:[{id:'bsart',l:'Document type',t:'sel',opts:[['NB','Purchase Requisition']]}]},
-  {t:'items',key:'it',title:'Item Overview',rows:1,cols:[{id:'itm',l:'Itm',ro:1,v:()=>'10'},{id:'knttp',l:'A',ro:1},{id:'mat',l:'Material',ro:1},{id:'txt',l:'Short Text',ro:1},{id:'qty',l:'Quantity',w:6},{id:'un',l:'Un',ro:1},{id:'date',l:'Deliv. Date',w:10},{id:'werks',l:'Plant',ro:1},{id:'lgort',l:'SLoc',ro:1},{id:'ekgrp',l:'PGr',ro:1}]},
+  {t:'items',key:'it',title:'Item Overview',rows:1,cols:[{id:'itm',l:'Itm',ro:1,v:()=>'10'},{id:'knttp',l:'A',ro:1},{id:'pstyp',l:'I',ro:1},{id:'mat',l:'Material',ro:1},{id:'txt',l:'Short Text',ro:1},{id:'qty',l:'Quantity',w:6},{id:'un',l:'Un',ro:1},{id:'date',l:'Deliv. Date',w:10},{id:'werks',l:'Plant',ro:1},{id:'lgort',l:'SLoc',ro:1},{id:'ekgrp',l:'PGr',ro:1}]},
   {t:'tabs',key:'det',title:'Item  [ 10 ]  300012457  BEARING SKF 6205-2RS',tabs:[
    {l:'Quantities/Dates',fields:[{id:'it.0.qty',l:'Quantity',w:8},{id:'it.0.date',l:'Delivery date',w:10}]},
    {l:'Account Assignment',fields:[{id:'it.0.wbs',l:'WBS Element',t:'ro'}]},
@@ -2742,7 +2743,7 @@ const SBX={
 ME51N:{tip:'Pilih Document type dulu (ZINV ke stok, ZOPX biaya cost center, ZCPX investasi). Isi item, Enter, lengkapi tab Account Assignment, Check, lalu Save. Strategi release muncul di tab header Release strategy.',screens:()=>[{title:'Create Purchase Requisition',go:'save',checkOk:'No messages issued during check',def:{bsart:'NB'},req:['it.0.mat','it.0.qty','it.0.date','it.0.werks','it.0.ekgrp'],
  blocks:[{t:'bar',fields:[{id:'bsart',l:'Document type',t:'sel',opts:Object.entries(PRTYPE).map(([k,v])=>[k,v[0]])},{id:'srcdet',l:'Source determination',t:'chk'}]},
   {t:'tabs',key:'hd',title:'Header',tabs:[{l:'Header Note',fields:[{id:'htxt',l:'Header Note',w:40}]},{l:'Release strategy',fields:[{id:'rstrat',l:'Release strategy',t:'ro'},{id:'rind',l:'Release indicator',t:'ro'}]}]},
-  {t:'items',key:'it',title:'Item Overview',rows:1,cols:[{id:'itm',l:'Itm',ro:1,v:()=>'10'},{id:'knttp',l:'A',w:2,f4:'knttp'},{id:'mat',l:'Material',w:11,f4:'matnr'},{id:'txt',l:'Short Text',ro:1},{id:'qty',l:'Quantity',w:6},{id:'un',l:'Un',ro:1},{id:'date',l:'Deliv. Date',w:10},{id:'werks',l:'Plant',w:5,f4:'werks'},{id:'lgort',l:'SLoc',w:5,f4:'lgort'},{id:'ekgrp',l:'PGr',w:4,f4:'ekgrp'}]},
+  {t:'items',key:'it',title:'Item Overview',rows:1,cols:[{id:'itm',l:'Itm',ro:1,v:()=>'10'},{id:'knttp',l:'A',w:2,f4:'knttp'},{id:'pstyp',l:'I',w:2,f4:'pstyp'},{id:'mat',l:'Material',w:11,f4:'matnr'},{id:'txt',l:'Short Text',ro:1},{id:'qty',l:'Quantity',w:6},{id:'un',l:'Un',ro:1},{id:'date',l:'Deliv. Date',w:10},{id:'werks',l:'Plant',w:5,f4:'werks'},{id:'lgort',l:'SLoc',w:5,f4:'lgort'},{id:'ekgrp',l:'PGr',w:4,f4:'ekgrp'}]},
   {t:'tabs',key:'det',title:v=>'Item  [ 10 ]  '+(v['it.0.mat']||'')+'  '+(v['it.0.txt']||''),tabs:[
    {l:'Material Data',fields:[{id:'it.0.mat',l:'Material',t:'ro'},{id:'it.0.txt',l:'Short text',t:'ro'},{id:'it.0.mg',l:'Material Group',t:'ro'}]},
    {l:'Quantities/Dates',fields:[{id:'it.0.qty',l:'Quantity',w:8},{id:'it.0.date',l:'Delivery date',w:10}]},
@@ -2754,6 +2755,7 @@ ME51N:{tip:'Pilih Document type dulu (ZINV ke stok, ZOPX biaya cost center, ZCPX
   if(!['','K','P','F','A'].includes(k))return E(`Account assignment category ${k} does not exist`,'Pilihan: kosong (stok), K, P, F, A (F4).','it.0.knttp');
   const bs=v.bsart||'NB';const allow={ZINV:[''],ZOPX:['K','F'],ZCPX:['A','P','F']}[bs];
   if(allow&&!allow.includes(k))return E(`Account assignment category ${k||'(blank)'} not allowed with document type ${bs}`,{ZINV:'ZINV untuk barang masuk stok: kosongkan kolom A.',ZOPX:'ZOPX untuk biaya: pakai K (cost center) atau F (order).',ZCPX:'ZCPX untuk investasi: pakai A (asset), P (WBS), atau F (internal order).'}[bs],'it.0.knttp');
+  if(norm(v['it.0.pstyp']))return E('Item category '+norm(v['it.0.pstyp'])+' not allowed for a material item','PR material: kolom I dikosongkan (D = Service hanya untuk PR jasa).','it.0.pstyp');
   let e=vMat(v['it.0.mat'],'it.0.mat');if(e)return e;
   const [q,eq]=vQty(v['it.0.qty'],'it.0.qty');if(eq)return eq;
   e=vDate(v['it.0.date'],'it.0.date',true);if(e)return e;
@@ -4075,10 +4077,10 @@ const REWARDS=[
  ['pm','PPT make over',500,'Merapikan desain presentasi yang sudah kamu punya.','ppt','pptfix','Maks. 10 slide'],
  ['pt','PPT Personal',1000,'PPT untuk tugas/project/sidang kamu.','ppt','ppt','Maks. 15 slide'],
  ['pp','PPT Portfolio',1250,'Portfolio dalam bentuk PPT/PDF.','ppt','pptport'],
- ['pa','+ Panel Admin',1500,'Add-on panel admin buat website portfolio atau website custom dasarmu, tanpa coding sendiri.','web','admin'],
+ ['pa','+ Panel Admin',750,'Add-on panel admin buat website portfolio atau website custom dasarmu, tanpa coding sendiri.','web','admin'],
  ['pw','Portfolio Web',3000,'Portfolio dalam bentuk website (tanpa panel admin).','web','web'],
  ['wb','Web Custom Basic',3500,'Website fungsional yang disesuaikan dengan kebutuhan kamu.','web','webcode'],
- ['ps','Platform Belajar Psikotes',600,'Akses ke platform belajar Psikotes-nya JACIWEY.','pkt','psiko'],
+ ['ps','Platform Belajar Psikotes',300,'Akses ke platform belajar Psikotes-nya JACIWEY.','pkt','psiko'],
  ['ck','Career Lite',750,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','case'],
  ['kt','Career Kit',3600,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','casek'],
  ['kp','Career Kit Plus',4000,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','rocket']];
@@ -4757,7 +4759,7 @@ function renderRef(){
 }
 
 /* ===================== INIT ===================== */
-$('#brandMark').innerHTML=`<img src="${MSRC.cic.ava}" alt="" width="42" height="42">`;
+$('#brandMark').innerHTML=`<img class="bm-a" src="${MSRC.cic.ava}" alt=""><img class="bm-b" src="${MSRC.awe.tenang}" alt=""><span class="bm-cmd">/n</span>`;
 $('#menuBtn').onclick=()=>{const s=$('#side');s.classList.toggle('open');$('#menuBtn').setAttribute('aria-expanded',s.classList.contains('open'));};
 const closeMenu=()=>{$('#side').classList.remove('open');$('#menuBtn').setAttribute('aria-expanded','false');};
 $('#nav').addEventListener('click',e=>{if(e.target.closest('a'))closeMenu();});

@@ -1,12 +1,18 @@
 import { json, err } from "../_lib/auth.js";
 import { loadUser, pendingRequests } from "../_lib/access.js";
+import { redemptions, getSettings } from "../_lib/shop.js";
 
 const MAX = 256 * 1024;
 
 export async function onRequestGet({ env, data }) {
-  const [progress, u, all] = await Promise.all([env.DATA.get(`progress:${data.user}`), loadUser(env, data.user), pendingRequests(env)]);
+  const [progress, u, all, rdm, set] = await Promise.all([env.DATA.get(`progress:${data.user}`), loadUser(env, data.user), pendingRequests(env), redemptions(env), getSettings(env)]);
+  const admin = u?.admin === true;
   const requests = all.filter((r) => r.user === data.user).map(({ id, type, target, at }) => ({ id, type, target, at }));
-  return json({ user: data.user, admin: u?.admin === true, progress, role: u?.role ?? null, roles: u?.roles ?? [], mods: u?.mods ?? [], requests });
+  const out = { user: data.user, admin, progress, role: u?.role ?? null, roles: u?.roles ?? [], mods: u?.mods ?? [], requests, wa: set.wa || null };
+  // Admin: count of things waiting (access requests + rewards to hand over). User: vouchers already handed over.
+  if (admin) out.notif = all.length + rdm.filter((r) => !r.done).length;
+  else out.done = rdm.filter((r) => r.user === data.user && r.done).map((r) => r.id);
+  return json(out);
 }
 
 async function save({ request, env, data }) {

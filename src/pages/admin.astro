@@ -42,7 +42,23 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
   .aedit .grp{font-size:13px;color:var(--meta);margin:10px 0 2px}
   .aedit .from{font-size:13px;color:var(--meta)}
   .aedit .st{font-size:14px;margin-left:8px}
-  @media (max-width:600px){.arow .btn{flex:1 1 0}.aedit .btn,#copy{width:100%}#until{display:block;margin:8px 0 0}.aedit .st{display:block;margin:8px 0 0}}
+  .arow .btn{white-space:nowrap}
+  .ncount{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;margin-left:8px;border-radius:999px;background:var(--bad);color:#fff;font-size:13px;vertical-align:2px}
+  .ncount:empty{display:none}
+  .admin h3{font-size:15px;margin:16px 0 4px}
+  .admin form.inl{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .admin form.inl label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--meta);flex:1 1 160px}
+  .admin form.inl input{min-height:44px;padding:8px 10px;font-size:16px;border:1px solid var(--field);border-radius:8px;background:var(--bg);color:var(--ink)}
+  .admin form.inl .btn{margin:0}
+  .done{opacity:.6}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:0 0 12px}
+  .stats div{padding:10px 12px;background:var(--bg);border-radius:8px}
+  .stats b{display:block;font-size:18px;color:var(--ink)}
+  .stats span{font-size:13px;color:var(--meta)}
+  .xtbl{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 12px}
+  .xtbl td{padding:6px 0;border-bottom:1px solid var(--line)}
+  .xtbl td+td{text-align:right;font-variant-numeric:tabular-nums}
+  @media (max-width:600px){.admin form.inl .btn{width:100%}.arow .btn{flex:1 1 0}.aedit .btn,#copy{width:100%}#until{display:block;margin:8px 0 0}.aedit .st{display:block;margin:8px 0 0}}
 </style>
 </head>
 <body>
@@ -69,8 +85,32 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
     <p id="msg" role="alert" aria-live="polite" class="err"></p>
   </section>
   <section id="reqCard" class="card" hidden>
-    <h2>Permintaan akses</h2>
+    <h2>Notifikasi <span id="ncount" class="ncount"></span></h2>
+    <p class="hint">Diperbarui otomatis setiap 30 detik.</p>
+    <h3>Permintaan akses (keranjang add-on)</h3>
     <div id="reqs"></div>
+    <h3>Penukaran reward & kupon</h3>
+    <div id="rdms"></div>
+  </section>
+  <section id="cpnCard" class="card" hidden>
+    <h2>Kupon</h2>
+    <p class="hint">Peserta memasukkan kode di halaman EXP & Reward. Koin dipotong sesuai harga; tiap kode hanya bisa dipakai sekali.</p>
+    <form id="cpnForm" class="inl">
+      <label>Reward<input id="cpnReward" maxlength="120" required placeholder="Contoh: Mentoring 30 menit"></label>
+      <label style="flex:0 1 120px">Harga (koin)<input id="cpnCost" type="number" inputmode="numeric" min="0" max="100000" step="1" required value="0"></label>
+      <label>Kode (opsional)<input id="cpnCode" maxlength="32" placeholder="Otomatis bila kosong" style="text-transform:uppercase"></label>
+      <button class="btn">Buat kupon</button>
+    </form>
+    <div id="cpns"></div>
+  </section>
+  <section id="waCard" class="card" hidden>
+    <h2>WhatsApp admin</h2>
+    <p class="hint">Dipakai untuk checkout keranjang dan klaim reward. Kosongkan untuk mematikan.</p>
+    <form id="waForm" class="inl">
+      <label>Nomor WhatsApp<input id="waNum" inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx"></label>
+      <button class="btn">Simpan</button>
+    </form>
+    <p id="waSt" class="meta" role="status"></p>
   </section>
   <section id="usrCard" class="card" hidden>
     <h2>Pengguna</h2>
@@ -89,7 +129,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
       return r.json();
     });
   }
-  function fail(e) { if (e !== 0) $('msg').textContent = 'Terjadi kesalahan, coba lagi'; }
+  function fail(e) { if (e !== 0) $('msg').textContent = (e && e.message) || 'Terjadi kesalahan, coba lagi'; }
   function load() {
     return api('GET').then(function (d) {
       $('panel').hidden = false;
@@ -133,15 +173,113 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
     return fetch(url, init).then(function (r) {
       if (r.status === 401) { location.href = '/login'; throw 0; }
       if (r.status === 403) { $('denied').hidden = false; $('panel').hidden = true; $('reqCard').hidden = true; $('usrCard').hidden = true; throw 0; }
-      if (!r.ok) throw new Error();
-      return r.json();
+      return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || ''); return d; });
     });
+  }
+  var when = function (t) { return new Date(t).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }); };
+  function notifs(d) {
+    renderReqs(d.requests); renderRdms(d.redemptions);
+    var n = d.requests.length + d.redemptions.filter(function (r) { return !r.done; }).length;
+    $('ncount').textContent = n || '';
+    document.title = (n ? '(' + n + ') ' : '') + 'Admin · Akademi SAP Admin Proyek';
   }
   function reload() {
     return adm('GET', '/api/admin/users').then(function (d) {
-      $('reqCard').hidden = false; $('usrCard').hidden = false;
-      renderReqs(d.requests); renderUsers(d.users);
+      ['reqCard', 'usrCard', 'cpnCard', 'waCard'].forEach(function (id) { $(id).hidden = false; });
+      notifs(d); renderUsers(d.users);
+      if (document.activeElement !== $('waNum')) $('waNum').value = (d.settings && d.settings.wa) || '';
+      return loadCoupons();
     }).catch(fail);
+  }
+  // Poll only the notification lists so an open user editor is not reset.
+  setInterval(function () {
+    if (document.hidden) return;
+    adm('GET', '/api/admin/users').then(notifs).catch(function () {});
+  }, 30000);
+  function renderRdms(list) {
+    var box = $('rdms'); box.textContent = '';
+    var open = list.filter(function (r) { return !r.done; }), done = list.filter(function (r) { return r.done; });
+    if (!open.length) box.append(cls(el('p', 'Tidak ada penukaran baru.', 'margin:0'), 'meta'));
+    var row = function (r) {
+      var rw = cls(el('div'), 'arow' + (r.done ? ' done' : ''));
+      var info = cls(el('div'), 'grow');
+      info.append(el('strong', r.user), el('div', r.t + ' · ' + r.cost + ' koin' + (r.coupon ? ' · kupon ' + r.coupon : '')),
+        cls(el('div', r.id + ' · ' + when(r.at) + (r.done ? ' · selesai ' + when(r.doneAt) : '')), 'sub'));
+      rw.append(info);
+      if (!r.done) {
+        var b = cls(el('button', 'Tandai selesai'), 'btn'); b.type = 'button';
+        b.onclick = function () { b.disabled = true; adm('POST', '/api/admin/redemptions/' + encodeURIComponent(r.id), { action: 'done' }).catch(fail).then(reload); };
+        rw.append(b);
+      }
+      return rw;
+    };
+    open.forEach(function (r) { box.append(row(r)); });
+    if (done.length) {
+      var det = el('details'); det.append(el('summary', 'Riwayat selesai (' + done.length + ')', 'cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:14px'));
+      done.slice(0, 50).forEach(function (r) { det.append(row(r)); });
+      box.append(det);
+    }
+  }
+  function loadCoupons() {
+    return adm('GET', '/api/admin/coupons').then(function (d) {
+      var box = $('cpns'); box.textContent = '';
+      if (!d.coupons.length) { box.append(cls(el('p', 'Belum ada kupon.', 'margin:12px 0 0'), 'meta')); return; }
+      d.coupons.forEach(function (c) {
+        var rw = cls(el('div'), 'arow' + (c.usedBy ? ' done' : ''));
+        var info = cls(el('div'), 'grow');
+        var code = el('code', c.code, 'user-select:all;font-weight:700');
+        info.append(code, el('div', c.reward + ' · ' + c.cost + ' koin'), cls(el('div', c.usedBy ? 'Dipakai ' + c.usedBy + ' · ' + when(c.usedAt) : 'Belum dipakai · dibuat ' + when(c.at)), 'sub'));
+        rw.append(info);
+        if (!c.usedBy) {
+          var del = cls(el('button', 'Hapus'), 'btn ghost'); del.type = 'button';
+          del.onclick = function () { del.disabled = true; adm('DELETE', '/api/admin/coupons?code=' + encodeURIComponent(c.code)).catch(fail).then(loadCoupons); };
+          rw.append(del);
+        }
+        box.append(rw);
+      });
+    }).catch(fail);
+  }
+  $('cpnForm').onsubmit = function (e) {
+    e.preventDefault(); $('msg').textContent = '';
+    var b = $('cpnForm').querySelector('button'); b.disabled = true;
+    adm('POST', '/api/admin/coupons', { reward: $('cpnReward').value, cost: Number($('cpnCost').value), code: $('cpnCode').value.trim() || undefined })
+      .then(function () { $('cpnForm').reset(); return loadCoupons(); }).catch(fail).then(function () { b.disabled = false; });
+  };
+  $('waForm').onsubmit = function (e) {
+    e.preventDefault(); $('waSt').textContent = '';
+    adm('PUT', '/api/admin/settings', { wa: $('waNum').value }).then(function (d) {
+      $('waNum').value = d.wa; $('waSt').textContent = d.wa ? 'Tersimpan ✓ wa.me/' + d.wa : 'WhatsApp dimatikan';
+    }).catch(function (x) { if (x !== 0) $('waSt').textContent = x.message || 'Gagal menyimpan'; });
+  };
+  // Per-user EXP, coins and redemptions (read-only).
+  function detail(u) {
+    var d = cls(el('div'), ''); d.append(cls(el('p', 'Memuat rincian…', 'margin:0 0 8px'), 'meta'));
+    adm('GET', '/api/admin/users/' + encodeURIComponent(u.name)).then(function (x) {
+      d.textContent = '';
+      var addOn = (x.roles || []).map(function (id) { return roleById[id] ? roleById[id].t : id; }).concat((x.mods || []).map(modLabel));
+      d.append(el('p', 'Role: ' + (x.role && roleById[x.role] ? roleById[x.role].t : 'belum pilih') + (addOn.length ? ' · Add-on: ' + addOn.join(', ') : ' · Tanpa add-on'), 'margin:0 0 10px;font-size:14px'));
+      var st = cls(el('div'), 'stats');
+      var stat = function (v, t) { var b = el('div'); b.append(el('b', v), el('span', t)); st.append(b); };
+      var n = function (v) { return Number(v || 0).toLocaleString('id-ID'); };
+      stat(x.xp ? n(x.xp.total) : '–', 'EXP sekarang');
+      stat(n(x.wallet.earned), 'Koin didapat');
+      stat(n(x.wallet.spent), 'Koin dipakai');
+      stat(n(x.wallet.coins), 'Saldo koin');
+      d.append(st);
+      if (x.xp) {
+        var t = cls(el('table'), 'xtbl');
+        [['Modul', x.xp.mod, x.xp.modMax], ['Praktik & ujian role', x.xp.role, x.xp.roleMax], ['Flashcard', (x.xp.cardH || 0) + (x.xp.cardO || 0), x.xp.cardMax], ['Misi Simulator bebas', x.xp.free, x.xp.freeMax], ['EXP belum ditukar', x.xp.avail, null]].forEach(function (r) {
+          var tr = el('tr'); tr.append(el('td', r[0]), el('td', n(r[1]) + (r[2] != null ? ' / ' + n(r[2]) : ''))); t.append(tr);
+        });
+        d.append(t);
+      } else d.append(cls(el('p', 'Rincian EXP muncul setelah peserta membuka aplikasi lagi.', 'margin:0 0 10px'), 'meta'));
+      d.append(el('div', 'Penukaran', 'font-weight:500;margin:4px 0'));
+      if (!x.redeemed.length) d.append(cls(el('p', 'Belum ada.', 'margin:0 0 8px'), 'meta'));
+      x.redeemed.forEach(function (r) {
+        d.append(cls(el('div', r.code + ' · ' + r.t + ' · ' + r.cost + ' koin · ' + when(r.at) + (r.done ? ' · selesai' : ' · menunggu'), 'padding:4px 0;font-size:14px'), r.done ? 'done' : ''));
+      });
+    }).catch(function (e) { d.textContent = ''; fail(e); });
+    return d;
   }
   function renderReqs(reqs) {
     var box = $('reqs'); box.textContent = '';
@@ -175,7 +313,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
       if ((u.roles || []).length) counts.push('+' + u.roles.length + ' role');
       if ((u.mods || []).length) counts.push('+' + u.mods.length + ' modul');
       info.append(nm, cls(el('div', (u.role && roleById[u.role] ? roleById[u.role].t : 'Belum pilih role') + (counts.length ? ' · ' + counts.join(' · ') : '')), 'sub'));
-      var open = cls(el('button', 'Atur'), 'btn ghost'); open.type = 'button';
+      var open = cls(el('button', 'Detail & atur'), 'btn ghost'); open.type = 'button';
       row.append(info, open);
       var ed = null;
       row.onclick = function () {
@@ -187,6 +325,7 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
   }
   function editor(u) {
     var d = cls(el('div'), 'aedit');
+    d.append(detail(u));
     if (u.admin) { d.append(el('p', 'Admin: akses semua modul', 'margin:0')); return d; }
     var sel = el('select'); sel.append(new Option('Belum pilih role', ''));
     var f1 = el('fieldset'); f1.append(el('legend', 'Role utama'), sel);

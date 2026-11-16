@@ -654,8 +654,11 @@ h2{font-size:clamp(21px,3vw,27px);line-height:1.2;letter-spacing:-.02em}
 h3{font-weight:700}
 .hero h1{font-size:clamp(33px,5.2vw,54px);line-height:1.05;letter-spacing:-.035em}
 .brand b{font-size:18px;letter-spacing:-.02em}
-.brand-mark{width:42px;height:42px;border-radius:50%;background:var(--band-blue);overflow:hidden;box-shadow:0 0 0 2px #fff,0 0 0 5px rgba(107,192,255,.28)}
-.brand-mark img{display:block;width:100%;height:100%;object-fit:cover}
+.brand-mark{position:relative;width:68px;height:42px;border-radius:0;background:none;box-shadow:none;display:block;overflow:visible}
+.brand-mark img{position:absolute;top:0;width:42px;height:42px;border-radius:50%;object-fit:cover;background:var(--band-blue);box-shadow:0 0 0 2px #fff}
+.brand-mark .bm-a{left:0;z-index:1}
+.brand-mark .bm-b{right:0;z-index:2}
+.brand-mark .bm-cmd{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;font:800 15px/1 var(--font-m);color:#fff;letter-spacing:-.02em;text-shadow:0 0 3px var(--navy),0 0 3px var(--navy),0 1px 2px var(--navy);pointer-events:none}
 .stat b{font-size:30px;line-height:1.15}
 .modcard h3{font-size:19px;line-height:1.25}
 .rolecard b{font-size:18px;line-height:1.25}
@@ -671,7 +674,8 @@ h3{font-weight:700}
 .side-foot b{display:block;color:#fff;font-weight:700;letter-spacing:.02em}
 
 /* narasi rata kanan-kiri; teks pendek di kartu sempit tetap rata kiri agar tidak berlubang */
-.lead,.prose p,.declare p,.callout,.exp,.outpath,.case-scene,.catsec>p,p.muted,.shop-note{text-align:justify;text-justify:inter-word;hyphens:auto;-webkit-hyphens:auto;text-wrap:pretty}
+.lead,.callout,.exp,.outpath,.catsec>p,p.muted,.shop-note{text-align:left;text-wrap:pretty}
+.prose p,.declare p,.case-scene{text-align:justify;text-justify:inter-word;hyphens:auto;-webkit-hyphens:auto;text-wrap:pretty}
 .hero .lead,.pagehero .lead{max-width:62ch}
 
 /* ----- maskot ----- */
@@ -755,7 +759,9 @@ h3{font-weight:700}
 .rw .btn{align-self:stretch}
 
 @media (max-width:900px){
-  .brand-mark{width:34px;height:34px;box-shadow:0 0 0 2px #fff}
+  .brand-mark{width:56px;height:34px;box-shadow:none}
+  .brand-mark img{width:34px;height:34px}
+  .brand-mark .bm-cmd{font-size:13px}
   .brand b{font-size:17px}
   .hero h1{font-size:clamp(31px,9vw,40px)}
   .stage{min-height:0;padding:18px 16px 14px}

@@ -35,6 +35,16 @@ Deploy from `main` only.
 - Local dev uses `.dev.vars` (`SESSION_SECRET`). Create a local admin with `wrangler kv key put user:<name> --local`.
 - There is no login rate limiting yet.
 
+### Coins, coupons & cart
+
+- **Set the admin WhatsApp number first** at `/admin` ("WhatsApp admin"). Cart checkout and reward claims open `wa.me/<number>`; without it, checkout only sends the requests.
+- Learners earn EXP, convert it to coins (5 EXP = 1 coin, from the artifact) and redeem rewards on `#reward`. `POST /api/redeem` checks the price (from `catalog.js`) against the stored progress, deducts coins and stores a receipt `rdm:<code>`. The learner sees a receipt with a "Klaim via WhatsApp" link.
+- **Coupons:** the admin creates a code with a custom reward and coin cost at `/admin` ("Kupon"). A learner enters it under the wallet; it is refused if they lack coins. Each code works once.
+- **Cart:** locked modules and extra roles go into a cart (floating button). Checkout creates all access requests in one call and opens the admin WhatsApp with the list.
+- **Notifikasi** at `/admin` lists pending access requests and unprocessed redemptions (polled every 30 s); "Tandai selesai" closes a redemption. The Admin link in the app shows the count.
+- "Rincian EXP", "Nilai setiap aktivitas" and "EXP per role" are admin-only. "Detail & atur" on a user shows role, add-ons, EXP breakdown, coins and redemptions.
+- EXP is computed in the browser, so a learner who edits their progress can inflate coins. KV has no transactions; two redeems at the same instant can both pass.
+
 ### CI/CD
 
 - **Deploy:** Cloudflare Pages is connected to this GitHub repo. A push to `main` builds (`npm run build`, output `dist`) and deploys production; every PR gets a preview URL posted by Cloudflare.
@@ -48,9 +58,9 @@ Generated from the artifact by `npm run sync`. **Do not hand-edit these files.**
 - `src/styles/app.css`: styles
 - `src/shell.html`: page shell (markup inside `<body>`)
 - `public/app.js`: client script
-- `functions/_lib/catalog.js`: roles and module ids
+- `functions/_lib/catalog.js`: roles, module ids, reward prices and coin rate
 
-`src/pages/index.astro` (head, fonts, loads the shell and script) and everything else (config, scripts, other pages) is hand-maintained.
+`src/pages/index.astro` (head, fonts, loads the shell and script), `src/styles/site.css` (cart, coupon, receipt styles) and everything else (config, scripts, other pages) is hand-maintained.
 
 ## 4. Updating from the artifact
 
