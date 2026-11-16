@@ -278,6 +278,17 @@ import { RGRP, ROLES, MODS, CATS } from '../../functions/_lib/catalog.js';
       x.redeemed.forEach(function (r) {
         d.append(cls(el('div', r.code + ' · ' + r.t + ' · ' + r.cost + ' koin · ' + when(r.at) + (r.done ? ' · selesai' : ' · menunggu'), 'padding:4px 0;font-size:14px'), r.done ? 'done' : ''));
       });
+      var rs = cls(el('button', 'Reset password'), 'btn ghost'); rs.type = 'button'; rs.style.marginTop = '10px';
+      var out = el('p', null, 'margin:8px 0 0;font-size:14px');
+      rs.onclick = function () {
+        if (rs.textContent !== 'Yakin reset?') { rs.textContent = 'Yakin reset?'; return; }
+        rs.disabled = true; $('msg').textContent = '';
+        adm('POST', '/api/admin/users/' + encodeURIComponent(u.name)).then(function (r) {
+          out.textContent = 'Password sementara: ';
+          out.append(el('code', r.password, 'user-select:all;font-weight:700'), el('br'), 'Kirim ke user, minta dia ganti lewat menu Ganti password.');
+        }).catch(fail).then(function () { rs.disabled = false; rs.textContent = 'Reset password'; });
+      };
+      d.append(rs, out);
     }).catch(function (e) { d.textContent = ''; fail(e); });
     return d;
   }

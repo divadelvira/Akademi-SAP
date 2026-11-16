@@ -1,4 +1,4 @@
-import { json, err, readJson, isAdmin } from "../../../_lib/auth.js";
+import { json, err, readJson, isAdmin, hashPassword } from "../../../_lib/auth.js";
 import { isRole, isMod, uniq, validIds, loadUser, saveUser } from "../../../_lib/access.js";
 import { COIN_RATE } from "../../../_lib/catalog.js";
 import { parseProgress, coinsOf, redemptions } from "../../../_lib/shop.js";
@@ -28,4 +28,13 @@ export async function onRequestPut({ request, env, data, params }) {
   const out = { role, roles: uniq(roles).filter((r) => r !== role), mods: uniq(mods) };
   await saveUser(env, params.name, { ...u, ...out });
   return json({ name: params.name, ...out });
+}
+
+export async function onRequestPost({ env, data, params }) {
+  if (!(await isAdmin(env, data.user))) return err("Khusus admin", 403);
+  const u = await loadUser(env, params.name);
+  if (!u) return err("User tidak ditemukan", 404);
+  const password = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+  await saveUser(env, params.name, { ...u, ...(await hashPassword(password)) });
+  return json({ name: params.name, password });
 }

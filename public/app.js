@@ -4070,20 +4070,20 @@ const EXP_MAX=25000, COIN_RATE=5, FREE_EXP=20;
 const EXPW={read:5,cp:10,bsim:30,bcase:20,mx:60,rsim:50,rcase:40,rx:80,rdone:50};
 const EXP_LABEL={read:'Membaca satu bab',cp:'Cek pemahaman bab benar di percobaan pertama',bsim:'Simulator bab (proporsional bintang, ★★★ penuh)',bcase:'Studi kasus bab (proporsional skor)',mx:'Ujian akhir modul (proporsional nilai terbaik)',rsim:'Simulator role (proporsional bintang)',rcase:'Studi kasus role (proporsional skor)',rx:'Ujian akhir role (proporsional nilai terbaik)',rdone:'Bonus role tuntas (semua modul inti & general dikuasai)'};
 const REWARDS=[
- ['cl','Cover Letter',50,'Satu cover letter yang disesuaikan dengan lowongan tujuanmu.','doc','mail'],
- ['lb','Banner LinkedIn',100,'Desain banner profil LinkedIn.','doc','banner'],
- ['cv','1 CV gratis',150,'Satu CV ATS-friendly.','doc','cv'],
- ['lr','Rebranding LinkedIn',350,'Siap rework LinkedIn kamu untuk tampil lebih menarik.','doc','rebrand'],
- ['pm','PPT make over',500,'Merapikan desain presentasi yang sudah kamu punya.','ppt','pptfix','Maks. 10 slide'],
- ['pt','PPT Personal',1000,'PPT untuk tugas/project/sidang kamu.','ppt','ppt','Maks. 15 slide'],
- ['pp','PPT Portfolio',1250,'Portfolio dalam bentuk PPT/PDF.','ppt','pptport'],
- ['pa','+ Panel Admin',750,'Add-on panel admin buat website portfolio atau website custom dasarmu, tanpa coding sendiri.','web','admin'],
- ['pw','Portfolio Web',3000,'Portfolio dalam bentuk website (tanpa panel admin).','web','web'],
- ['wb','Web Custom Basic',3500,'Website fungsional yang disesuaikan dengan kebutuhan kamu.','web','webcode'],
- ['ps','Platform Belajar Psikotes',300,'Akses ke platform belajar Psikotes-nya JACIWEY.','pkt','psiko'],
- ['ck','Career Lite',750,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','case'],
- ['kt','Career Kit',3600,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','casek'],
- ['kp','Career Kit Plus',4000,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','rocket']];
+ ['cl','Cover Letter',150,'Satu cover letter yang disesuaikan dengan lowongan tujuanmu.','doc','mail'],
+ ['lb','Banner LinkedIn',200,'Desain banner profil LinkedIn.','doc','banner'],
+ ['cv','1 CV gratis',250,'Satu CV ATS-friendly.','doc','cv'],
+ ['lr','Rebranding LinkedIn',500,'Siap rework LinkedIn kamu untuk tampil lebih menarik.','doc','rebrand'],
+ ['pm','PPT make over',650,'Merapikan desain presentasi yang sudah kamu punya.','ppt','pptfix','Maks. 10 slide'],
+ ['pt','PPT Personal',1200,'PPT untuk tugas/project/sidang kamu.','ppt','ppt','Maks. 15 slide'],
+ ['pp','PPT Portfolio',1450,'Portfolio dalam bentuk PPT/PDF.','ppt','pptport'],
+ ['pa','+ Panel Admin',900,'Add-on panel admin buat website portfolio atau website custom dasarmu, tanpa coding sendiri.','web','admin'],
+ ['pw','Portfolio Web',3200,'Portfolio dalam bentuk website (tanpa panel admin).','web','web'],
+ ['wb','Web Custom Basic',3600,'Website fungsional yang disesuaikan dengan kebutuhan kamu.','web','webcode'],
+ ['ps','Platform Belajar Psikotes',450,'Akses ke platform belajar Psikotes-nya JACIWEY.','pkt','psiko'],
+ ['ck','Career Lite',1000,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','case'],
+ ['kt','Career Kit',3750,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','casek'],
+ ['kp','Career Kit Plus',4500,'Paket Career-nya JACIWEY nih. Penasaran? Cek informasinya di Instagram jaciwey.studio.','pkt','rocket']];
 const RWCAT=[['doc','Dokumen karier'],['ppt','Presentasi'],['web','Website'],['pkt','Belajar & paket Career']];
 const RWICO={
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7.5 9 6 9-6"/>',
